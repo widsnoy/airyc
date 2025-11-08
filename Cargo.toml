@@ -1,10 +1,6 @@
 [workspace]
-members = [
-    "src/sysy-compiler",
-]
-resolver = "2"
+members = ["src/sysy-compiler"]
 
 [workspace.dependencies]
-# 共享依赖版本
 logos = "0.14"
 rowan = "0.16"
