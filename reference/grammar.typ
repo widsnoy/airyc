@@ -76,8 +76,8 @@
     LVal '=' Exp ';' \
     #sym.bar [ Exp ] ';' \
     #sym.bar Block \
-    #sym.bar 'if' '(' Cond ')' Stmt [ 'else' Stmt ] \
-    #sym.bar 'while' '(' Cond ')' Stmt \
+    #sym.bar 'if' '(' Exp ')' Stmt [ 'else' Stmt ] \
+    #sym.bar 'while' '(' Exp ')' Stmt \
     #sym.bar 'break' ';' \
     #sym.bar 'continue' ';' \
     #sym.bar 'return' [ Exp ] ';'
@@ -121,9 +121,6 @@
   [],
   [],
   [ #comment("-> 为指针成员访问") ],
-  LHS[Cond],
-  arrow,
-  [ Exp ],
   LHS[LVal],
   arrow,
   [ Ident { '[' Exp ']' #sym.bar '.' Ident } ],
@@ -138,13 +135,13 @@
   [ IntConst #sym.bar floatConst ],
   LHS[UnaryOp],
   arrow,
-  [ '+' #sym.bar '−' #sym.bar '!' #sym.bar '&' #sym.bar '\*' ],
+  [ '+' #sym.bar '-' #sym.bar '!' #sym.bar '&' #sym.bar '\*' ],
   [],
   [],
   [ #comment("& 为取地址，* 为解引用") ],
   LHS[BinaryOp],
   arrow,
-  [ '+' #sym.bar '−' #sym.bar '\*' #sym.bar '/' #sym.bar '%' \
+  [ '+' #sym.bar '-' #sym.bar '\*' #sym.bar '/' #sym.bar '%' \
     #sym.bar '<' #sym.bar '>' #sym.bar '<=' #sym.bar '>=' \
     #sym.bar '==' #sym.bar '!=' \
     #sym.bar '&&' #sym.bar '||' ],
