@@ -1,6 +1,6 @@
-use std::ops::Range;
-
+use crate::syntax_kind::SyntaxKind;
 use logos::Logos;
+use std::ops::Range;
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum LexerErrorKind {
@@ -18,211 +18,327 @@ pub struct LexerError {
     pub span: Range<usize>,
 }
 
-/// SyntaxKind
+/// 词法单元 (Tokens)
 #[derive(Logos, Debug, PartialEq, Clone)]
 #[logos(error = LexerErrorKind)]
+#[allow(non_camel_case_types)]
 pub enum Token {
-    // Trivia
+    // Trivia (空白与注释)
     #[regex(r"[ \t]+")]
-    Whitespace,
-    #[regex(r"(\r\n|\n|\r)+")]
-    Newline,
+    WHITESPACE,
+    #[regex(r"(\r\n|\n|\r)")]
+    NEWLINE,
     #[regex(r"//[^\n]*")]
-    LineComment,
+    COMMENT_LINE,
     #[regex(r"/\*([^*]|\*[^/])*\*/")]
-    BlockComment,
+    COMMENT_BLOCK,
+
     // Keywords
     #[token("const")]
-    Const,
+    CONST_KW,
     #[token("int")]
-    Int,
+    INT_KW,
     #[token("float")]
-    Float,
+    FLOAT_KW,
     #[token("void")]
-    Void,
+    VOID_KW,
     #[token("if")]
-    If,
+    IF_KW,
     #[token("else")]
-    Else,
+    ELSE_KW,
     #[token("while")]
-    While,
+    WHILE_KW,
     #[token("break")]
-    Break,
+    BREAK_KW,
     #[token("continue")]
-    Continue,
+    CONTINUE_KW,
     #[token("return")]
-    Return,
+    RETURN_KW,
     #[token("struct")]
-    Struct,
+    STRUCT_KW,
     #[token("impl")]
-    Impl,
+    IMPL_KW,
 
     // Operators and punctuation
     #[token("=")]
-    Eq,
+    EQ,
     #[token(";")]
-    Semicolon,
+    SEMI,
     #[token(",")]
-    Comma,
+    COMMA,
     #[token("{")]
-    LBrace,
+    L_BRACE,
     #[token("}")]
-    RBrace,
+    R_BRACE,
     #[token("(")]
-    LParen,
+    L_PAREN,
     #[token(")")]
-    RParen,
+    R_PAREN,
     #[token("[")]
-    LBracket,
+    L_BRACK,
     #[token("]")]
-    RBracket,
+    R_BRACK,
     #[token("*")]
-    Star,
+    STAR,
     #[token(".")]
-    Dot,
+    DOT,
     #[token("->")]
-    Arrow,
+    ARROW,
 
     // Arithmetic operators
     #[token("+")]
-    Plus,
+    PLUS,
     #[token("-")]
-    Minus,
+    MINUS,
     #[token("/")]
-    Slash,
+    SLASH,
     #[token("%")]
-    Percent,
+    PERCENT,
 
     // Comparison operators
     #[token("==")]
-    EqEq,
+    EQEQ,
     #[token("!=")]
-    Ne,
+    NEQ,
     #[token("<")]
-    Lt,
+    LT,
     #[token(">")]
-    Gt,
+    GT,
     #[token("<=")]
-    Le,
+    LTEQ,
     #[token(">=")]
-    Ge,
+    GTEQ,
 
     // Logical operators
     #[token("&&")]
-    And,
+    AMPAMP,
     #[token("||")]
-    Or,
+    PIPEPIPE,
     #[token("!")]
-    Not,
+    BANG,
 
     /// ref address
     #[token("&")]
-    Amp,
+    AMP,
 
     // Literals
-    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
-    Ident(String),
-    #[regex(r"0[xX][0-9a-fA-F]+", |lex| i32::from_str_radix(&lex.slice()[2..], 16).map_err(|_| LexerErrorKind::InvalidInteger), priority = 3)]
-    #[regex(r"0[0-7]*", |lex| i32::from_str_radix(lex.slice(), 8).map_err(|_| LexerErrorKind::InvalidInteger), priority = 3)]
-    #[regex(r"[1-9][0-9]*", |lex| lex.slice().parse().map_err(|_| LexerErrorKind::InvalidInteger), priority = 3)]
-    IntLiteral(i32),
+    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*")]
+    IDENT,
+    #[regex(r"0[xX][0-9a-fA-F]+", priority = 3)]
+    #[regex(r"0[0-7]*", priority = 3)]
+    #[regex(r"[1-9][0-9]*", priority = 3)]
+    INT_LITERAL,
 
-    #[regex(r"(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?", |lex| lex.slice().parse().map_err(|_| LexerErrorKind::InvalidFloat), priority = 2)]
-    FloatLiteral(f32),
-
-    // EOF
-    EOF,
+    #[regex(r"(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?", priority = 2)]
+    FLOAT_LITERAL,
 }
 
-/// Lexer
-pub struct Lexer {
-    tokens: Vec<(Token, Range<usize>)>,
+impl From<Token> for SyntaxKind {
+    fn from(token: Token) -> Self {
+        match token {
+            Token::WHITESPACE => SyntaxKind::WHITESPACE,
+            Token::NEWLINE => SyntaxKind::NEWLINE,
+            Token::COMMENT_LINE => SyntaxKind::COMMENT_LINE,
+            Token::COMMENT_BLOCK => SyntaxKind::COMMENT_BLOCK,
+            Token::CONST_KW => SyntaxKind::CONST_KW,
+            Token::INT_KW => SyntaxKind::INT_KW,
+            Token::FLOAT_KW => SyntaxKind::FLOAT_KW,
+            Token::VOID_KW => SyntaxKind::VOID_KW,
+            Token::IF_KW => SyntaxKind::IF_KW,
+            Token::ELSE_KW => SyntaxKind::ELSE_KW,
+            Token::WHILE_KW => SyntaxKind::WHILE_KW,
+            Token::BREAK_KW => SyntaxKind::BREAK_KW,
+            Token::CONTINUE_KW => SyntaxKind::CONTINUE_KW,
+            Token::RETURN_KW => SyntaxKind::RETURN_KW,
+            Token::STRUCT_KW => SyntaxKind::STRUCT_KW,
+            Token::IMPL_KW => SyntaxKind::IMPL_KW,
+            Token::EQ => SyntaxKind::EQ,
+            Token::SEMI => SyntaxKind::SEMI,
+            Token::COMMA => SyntaxKind::COMMA,
+            Token::L_BRACE => SyntaxKind::L_BRACE,
+            Token::R_BRACE => SyntaxKind::R_BRACE,
+            Token::L_PAREN => SyntaxKind::L_PAREN,
+            Token::R_PAREN => SyntaxKind::R_PAREN,
+            Token::L_BRACK => SyntaxKind::L_BRACK,
+            Token::R_BRACK => SyntaxKind::R_BRACK,
+            Token::STAR => SyntaxKind::STAR,
+            Token::DOT => SyntaxKind::DOT,
+            Token::ARROW => SyntaxKind::ARROW,
+            Token::PLUS => SyntaxKind::PLUS,
+            Token::MINUS => SyntaxKind::MINUS,
+            Token::SLASH => SyntaxKind::SLASH,
+            Token::PERCENT => SyntaxKind::PERCENT,
+            Token::EQEQ => SyntaxKind::EQEQ,
+            Token::NEQ => SyntaxKind::NEQ,
+            Token::LT => SyntaxKind::LT,
+            Token::GT => SyntaxKind::GT,
+            Token::LTEQ => SyntaxKind::LTEQ,
+            Token::GTEQ => SyntaxKind::GTEQ,
+            Token::AMPAMP => SyntaxKind::AMPAMP,
+            Token::PIPEPIPE => SyntaxKind::PIPEPIPE,
+            Token::BANG => SyntaxKind::BANG,
+            Token::AMP => SyntaxKind::AMP,
+            Token::IDENT => SyntaxKind::IDENT,
+            Token::INT_LITERAL => SyntaxKind::INT_LITERAL,
+            Token::FLOAT_LITERAL => SyntaxKind::FLOAT_LITERAL,
+        }
+    }
 }
 
-impl Lexer {
-    /// Create a new lexer from the given text
-    pub fn new(text: &str) -> Result<Self, LexerError> {
+/// 词法分析器
+pub struct Lexer<'a> {
+    tokens: Vec<(SyntaxKind, &'a str)>,
+    pos: usize,
+    pos_skip_trivia: usize,
+    pos_skip_trivia_1: usize,
+}
+
+impl<'a> Lexer<'a> {
+    pub fn new(text: &'a str) -> Self {
         let mut tokens = Vec::new();
-        let mut lexer = Token::lexer(text);
+        let mut inner = Token::lexer(text).spanned();
 
-        while let Some(result) = lexer.next() {
-            let span = lexer.span();
-            match result {
-                Ok(token) => tokens.push((token, span)),
-                Err(kind) => {
-                    return Err(LexerError {
-                        kind,
-                        text: lexer.slice().to_string(),
-                        span,
-                    });
-                }
+        while let Some((res, span)) = inner.next() {
+            let kind = match res {
+                Ok(token) => token.into(),
+                Err(_) => SyntaxKind::ERROR,
+            };
+            tokens.push((kind, &text[span]));
+        }
+
+        let pos_skip_trivia = Self::get_next_non_trivia_pos(&tokens, 0usize);
+        let pos_skip_trivia_1 = Self::get_next_non_trivia_pos(&tokens, pos_skip_trivia + 1);
+
+        Self {
+            tokens,
+            pos: 0,
+            pos_skip_trivia,
+            pos_skip_trivia_1,
+        }
+    }
+
+    /// 获取从当前位置开始的第一个非 Trivia Token 的位置
+    fn get_next_non_trivia_pos(tokens: &Vec<(SyntaxKind, &str)>, start_pos: usize) -> usize {
+        let mut pos = start_pos;
+        while pos < tokens.len() {
+            let kind = tokens[pos].0;
+            if !kind.is_trivia() {
+                break;
+            }
+            pos += 1;
+        }
+        pos
+    }
+
+    /// 返回当前 Token 的类型
+    pub fn current(&self) -> SyntaxKind {
+        self.tokens
+            .get(self.pos)
+            .map(|t| t.0)
+            .unwrap_or(SyntaxKind::EOF)
+    }
+
+    /// 返回当前 Token 的文本内容
+    pub fn current_text(&self) -> &'a str {
+        self.tokens.get(self.pos).map(|t| t.1).unwrap_or("")
+    }
+
+    /// 返回当前非 Trivia Token 的类型
+    pub fn current_without_trivia(&self) -> SyntaxKind {
+        self.tokens
+            .get(self.pos_skip_trivia)
+            .map(|t| t.0)
+            .unwrap_or(SyntaxKind::EOF)
+    }
+
+    /// 返回下一个非 Trivia Token 的类型
+    pub fn current_without_trivia_1(&self) -> SyntaxKind {
+        self.tokens
+            .get(self.pos_skip_trivia_1)
+            .map(|t| t.0)
+            .unwrap_or(SyntaxKind::EOF)
+    }
+
+    /// 移动到下一个 Token
+    pub fn bump(&mut self) {
+        if self.pos < self.tokens.len() {
+            self.pos += 1;
+            if self.pos > self.pos_skip_trivia {
+                self.pos_skip_trivia = self.pos_skip_trivia_1;
+                self.pos_skip_trivia_1 =
+                    Self::get_next_non_trivia_pos(&self.tokens, self.pos_skip_trivia_1 + 1);
             }
         }
-
-        tokens.reverse();
-
-        Ok(Self { tokens })
     }
 
-    /// Get the next token
-    pub fn next(&mut self) -> Option<(Token, Range<usize>)> {
-        self.tokens.pop()
-    }
-
-    /// Peek at the next token without consuming it
-    pub fn peak(&self) -> Token {
-        match self.tokens.last() {
-            Some((token, _)) => token.clone(),
-            None => Token::EOF,
-        }
+    /// 检查当前 Token 是否匹配 `kind`
+    pub fn at(&self, kind: SyntaxKind) -> bool {
+        self.current() == kind
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use SyntaxKind::*;
+
+    fn check(source: &str, expected_tokens: &[(SyntaxKind, &str)]) {
+        let mut lexer = Lexer::new(source);
+        for (expected_kind, expected_text) in expected_tokens {
+            let kind = lexer.current();
+            let text = lexer.current_text();
+
+            assert_eq!(kind, *expected_kind);
+            assert_eq!(text, *expected_text);
+
+            lexer.bump();
+        }
+        assert_eq!(lexer.current(), EOF);
+    }
 
     #[test]
     fn test_lexer_basic() {
-        let source = "const int x = 42;";
-        let mut lexer = Lexer::new(source).unwrap();
-
-        let expected_tokens = vec![
-            (Token::Const, 0..5),
-            (Token::Whitespace, 5..6),
-            (Token::Int, 6..9),
-            (Token::Whitespace, 9..10),
-            (Token::Ident("x".to_string()), 10..11),
-            (Token::Whitespace, 11..12),
-            (Token::Eq, 12..13),
-            (Token::Whitespace, 13..14),
-            (Token::IntLiteral(42), 14..16),
-            (Token::Semicolon, 16..17),
-        ];
-
-        for expected in expected_tokens {
-            let token = lexer.next().unwrap();
-            assert_eq!(token, expected);
-        }
-
-        assert!(lexer.next().is_none());
+        check(
+            "const int x = 42;",
+            &[
+                (CONST_KW, "const"),
+                (WHITESPACE, " "),
+                (INT_KW, "int"),
+                (WHITESPACE, " "),
+                (IDENT, "x"),
+                (WHITESPACE, " "),
+                (EQ, "="),
+                (WHITESPACE, " "),
+                (INT_LITERAL, "42"),
+                (SEMI, ";"),
+            ],
+        );
     }
 
     #[test]
     fn test_star_token() {
-        let source = "int* ptr;";
-        let mut lexer = Lexer::new(source).unwrap();
-        let expected_tokens = vec![
-            (Token::Int, 0..3),
-            (Token::Star, 3..4),
-            (Token::Whitespace, 4..5),
-            (Token::Ident("ptr".to_string()), 5..8),
-            (Token::Semicolon, 8..9),
-        ];
-        for expected in expected_tokens {
-            let token = lexer.next().unwrap();
-            assert_eq!(token, expected);
-        }
-        assert!(lexer.next().is_none());
+        check(
+            "int* ptr;",
+            &[
+                (INT_KW, "int"),
+                (STAR, "*"),
+                (WHITESPACE, " "),
+                (IDENT, "ptr"),
+                (SEMI, ";"),
+            ],
+        );
+    }
+
+    #[test]
+    fn test_comments_and_whitespace() {
+        check(
+            "// comment\n/* block */ ",
+            &[
+                (COMMENT_LINE, "// comment"),
+                (NEWLINE, "\n"),
+                (COMMENT_BLOCK, "/* block */"),
+                (WHITESPACE, " "),
+            ],
+        );
     }
 }
