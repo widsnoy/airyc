@@ -116,7 +116,7 @@ impl Parser<'_> {
         }
     }
 
-    pub fn parse_lval_or_call_expr(&mut self) {
+    pub(super) fn parse_lval_or_call_expr(&mut self) {
         if self.at(SyntaxKind::STAR) {
             self.start_node(SyntaxKind::LVAL);
             self.bump(); // '*'
