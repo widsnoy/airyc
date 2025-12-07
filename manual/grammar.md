@@ -35,5 +35,5 @@ AddExp := MulExp | AddExp ('+' | '-') MulExp
 RelExp := AddExp | RelExp ('<' | '>' | '<=' | '>=') AddExp  
 EqExp := RelExp | EqExp ('==' | '!=') RelExp  
 LAndExp := EqExp | LAndExp '&&' EqExp  
-LOrExp := LOrExp | LOrExp '||' LAndExp  
+LOrExp := LAndExp | LOrExp '||' LAndExp  
 ConstExp := AddExp
