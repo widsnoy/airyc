@@ -31,7 +31,7 @@ pub enum Token {
     NEWLINE,
     #[regex(r"//[^\n]*")]
     COMMENT_LINE,
-    #[regex(r"/\*([^*]|\*[^/])*\*/")]
+    #[regex(r"/\*[^*]*\*+(?:[^/*][^*]*\*+)*/")]
     COMMENT_BLOCK,
 
     // Keywords

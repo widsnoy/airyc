@@ -156,3 +156,18 @@ fn test_expr_statement() {
     "#;
     insta::assert_debug_snapshot!(try_it(source));
 }
+
+#[test]
+fn test_comments() {
+    let source = r#"
+    /* normal comment */
+    /* comment with * inside */
+    /* comment with / inside */
+    /* comment with ** inside */
+    /* **/
+    /****/
+    /**/
+    int a = 1;
+    "#;
+    insta::assert_debug_snapshot!(try_it(source));
+}
