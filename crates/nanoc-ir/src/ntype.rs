@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NType {
     Int,
@@ -9,9 +11,13 @@ pub enum NType {
     Const(Box<NType>),
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Int(i32),
     Float(f32),
+    Array(BTreeMap<usize, Value>),
+    Struct(BTreeMap<String, Value>),
+    Symbol(String, i32),
 }
 
 pub enum EvalError {
@@ -20,22 +26,38 @@ pub enum EvalError {
 }
 
 impl Value {
-    pub fn eval(lhs: Value, rhs: Value, op: &str) -> Result<Value, EvalError> {
+    pub fn eval(lhs: &Value, rhs: &Value, op: &str) -> Result<Value, EvalError> {
         match (lhs, rhs) {
             (Value::Int(l), Value::Int(r)) => match op {
                 "+" => Ok(Value::Int(l + r)),
                 "-" => Ok(Value::Int(l - r)),
                 "*" => Ok(Value::Int(l * r)),
-                "/" => Ok(Value::Int(l / r)),
-                "%" => Ok(Value::Int(l % r)),
+                "/" => {
+                    if *r == 0 {
+                        Err(EvalError::UnsupportedOperation(
+                            "Division by zero".to_string(),
+                        ))
+                    } else {
+                        Ok(Value::Int(l / r))
+                    }
+                }
+                "%" => {
+                    if *r == 0 {
+                        Err(EvalError::UnsupportedOperation(
+                            "Modulo by zero".to_string(),
+                        ))
+                    } else {
+                        Ok(Value::Int(l % r))
+                    }
+                }
                 "!=" => Ok(Value::Int((l != r) as i32)),
                 "==" => Ok(Value::Int((l == r) as i32)),
                 "<" => Ok(Value::Int((l < r) as i32)),
                 "<=" => Ok(Value::Int((l <= r) as i32)),
                 ">" => Ok(Value::Int((l > r) as i32)),
                 ">=" => Ok(Value::Int((l >= r) as i32)),
-                "||" => Ok(Value::Int(((l != 0) || (r != 0)) as i32)),
-                "&&" => Ok(Value::Int(((l != 0) && (r != 0)) as i32)),
+                "||" => Ok(Value::Int(((*l != 0) || (*r != 0)) as i32)),
+                "&&" => Ok(Value::Int(((*l != 0) && (*r != 0)) as i32)),
                 _ => Err(EvalError::TypeMismatch),
             },
             (Value::Float(l), Value::Float(r)) => match op {
@@ -44,9 +66,112 @@ impl Value {
                 "*" => Ok(Value::Float(l * r)),
                 "/" => Ok(Value::Float(l / r)),
                 "%" => Ok(Value::Float(l % r)),
+                "!=" => Ok(Value::Int((l != r) as i32)),
+                "==" => Ok(Value::Int((l == r) as i32)),
+                "<" => Ok(Value::Int((l < r) as i32)),
+                "<=" => Ok(Value::Int((l <= r) as i32)),
+                ">" => Ok(Value::Int((l > r) as i32)),
+                ">=" => Ok(Value::Int((l >= r) as i32)),
+                _ => Err(EvalError::UnsupportedOperation(op.to_string())),
+            },
+            // 指针运算: Symbol + Int
+            (Value::Symbol(s, off), Value::Int(i)) => match op {
+                "+" => Ok(Value::Symbol(s.to_string(), off + i)),
+                "-" => Ok(Value::Symbol(s.to_string(), off - i)),
+                _ => Err(EvalError::UnsupportedOperation(op.to_string())),
+            },
+            // 指针运算: Int + Symbol
+            (Value::Int(i), Value::Symbol(s, off)) => match op {
+                "+" => Ok(Value::Symbol(s.to_string(), off + i)),
+                _ => Err(EvalError::UnsupportedOperation(op.to_string())),
+            },
+            // 指针运算: Symbol - Symbol (计算偏移量差值，仅当指向同一符号时有效)
+            (Value::Symbol(s1, off1), Value::Symbol(s2, off2)) => match op {
+                "-" => {
+                    if s1 == s2 {
+                        Ok(Value::Int(off1 - off2))
+                    } else {
+                        Err(EvalError::UnsupportedOperation(
+                            "Pointer subtraction with different symbols".to_string(),
+                        ))
+                    }
+                }
+                "==" => Ok(Value::Int((s1 == s2 && off1 == off2) as i32)),
+                "!=" => Ok(Value::Int((s1 != s2 || off1 != off2) as i32)),
                 _ => Err(EvalError::UnsupportedOperation(op.to_string())),
             },
             _ => Err(EvalError::TypeMismatch),
+        }
+    }
+
+    pub fn eval_unary(val: Value, op: &str) -> Result<Value, EvalError> {
+        match val {
+            Value::Int(v) => match op {
+                "+" => Ok(Value::Int(v)),
+                "-" => Ok(Value::Int(-v)),
+                "!" => Ok(Value::Int((v == 0) as i32)),
+                _ => Err(EvalError::UnsupportedOperation(op.to_string())),
+            },
+            Value::Float(v) => match op {
+                "+" => Ok(Value::Float(v)),
+                "-" => Ok(Value::Float(-v)),
+                _ => Err(EvalError::UnsupportedOperation(op.to_string())),
+            },
+            _ => Err(EvalError::TypeMismatch),
+        }
+    }
+
+    /// 获取多维数组或结构体中的元素
+    pub fn get(&self, indices: &[usize]) -> Option<&Value> {
+        let mut cur = self;
+        for &idx in indices {
+            match cur {
+                Value::Array(map) => {
+                    cur = map.get(&idx)?;
+                }
+                _ => return None,
+            }
+        }
+        Some(cur)
+    }
+
+    pub fn get_member(&self, member: &str) -> Option<&Value> {
+        match self {
+            Value::Struct(map) => map.get(member),
+            _ => None,
+        }
+    }
+
+    /// 修改多维数组或结构体中的元素
+    pub fn set(&mut self, indices: &[usize], val: Value) -> Result<(), ()> {
+        if indices.is_empty() {
+            *self = val;
+            return Ok(());
+        }
+
+        let (head, tail) = indices.split_first().unwrap();
+
+        match self {
+            Value::Array(map) => {
+                if tail.is_empty() {
+                    map.insert(*head, val);
+                    Ok(())
+                } else {
+                    let sub = map.get_mut(head).ok_or(())?;
+                    sub.set(tail, val)
+                }
+            }
+            _ => Err(()),
+        }
+    }
+
+    pub fn set_member(&mut self, member: &str, val: Value) -> Result<(), ()> {
+        match self {
+            Value::Struct(map) => {
+                map.insert(member.to_string(), val);
+                Ok(())
+            }
+            _ => Err(()),
         }
     }
 }

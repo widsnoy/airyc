@@ -1,9 +1,13 @@
-use std::{collections::HashSet, ops::Deref};
+use std::{
+    collections::{HashMap, HashSet},
+    env::var,
+    ops::Deref,
+};
 
 use text_size::{TextRange, TextSize};
 use thunderdome::Arena;
 
-use crate::ntype::NType;
+use crate::ntype::{NType, Value};
 
 #[derive(Default)]
 pub struct Module {
@@ -14,6 +18,9 @@ pub struct Module {
     pub global_scope: ScopeID,
     // 检查是否是编译期可计算的常量节点
     pub constant_nodes: HashSet<TextRange>,
+
+    // 记录编译时的在值，有的非 const 也可以求
+    pub value_table: HashMap<TextRange, Value>,
 
     // 分析的时候上下文，使用后清除
     pub(super) analyzing: AnalyzeContext,
@@ -48,7 +55,7 @@ impl Module {
     pub fn new_scope(&mut self, parent: Option<ScopeID>) -> ScopeID {
         let scope = Scope {
             parent,
-            variables: Vec::new(),
+            variables: HashMap::new(),
         };
         let id = self.scopes.insert(scope);
         ScopeID(id)
@@ -93,6 +100,15 @@ impl Deref for VariableID {
 pub struct Variable {
     pub name: String,
     pub ty: NType,
+    pub range: TextRange,
+    pub tag: VariableTag,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum VariableTag {
+    Define,
+    Write,
+    Read,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -152,7 +168,7 @@ impl Deref for ScopeID {
 
 pub struct Scope {
     pub parent: Option<ScopeID>,
-    pub variables: Vec<VariableID>,
+    pub variables: HashMap<String, HashSet<VariableID>>,
 }
 
 impl Scope {
@@ -161,10 +177,35 @@ impl Scope {
         variables: &mut Arena<Variable>,
         name: String,
         ty: NType,
+        range: TextRange,
+        tag: VariableTag,
     ) -> VariableID {
-        let idx = variables.insert(Variable { name, ty });
+        let idx = variables.insert(Variable {
+            name: name.clone(),
+            ty,
+            range,
+            tag,
+        });
         let var_id = VariableID(idx);
-        self.variables.push(var_id);
+        let entry = self.variables.entry(name).or_default();
+        entry.insert(var_id);
         var_id
+    }
+
+    /// 查找变量
+    pub fn look_up(&self, m: &Module, var_name: &str, var_tag: VariableTag) -> Option<VariableID> {
+        let mut u_opt = Some(self);
+        while let Some(u) = u_opt {
+            if let Some(entry) = u.variables.get(var_name)
+                && let Some(idx) = entry.iter().find(|x| {
+                    let var = m.variables.get(***x).unwrap();
+                    var.tag == var_tag
+                })
+            {
+                return Some(*idx);
+            }
+            u_opt = u.parent.map(|x| m.scopes.get(*x).unwrap());
+        }
+        None
     }
 }

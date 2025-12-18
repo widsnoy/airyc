@@ -1,8 +1,8 @@
 use nanoc_parser::ast::*;
 use nanoc_parser::visitor::Visitor;
 
-use crate::module::{Module, SemanticError};
-use crate::ntype::NType;
+use crate::module::{Module, SemanticError, VariableTag};
+use crate::ntype::{NType, Value};
 
 impl Visitor for Module {
     fn enter_comp_unit(&mut self, _node: CompUnit) {
@@ -29,7 +29,13 @@ impl Visitor for Module {
             let name = Self::eval_name(&name_node);
 
             let scope = self.scopes.get_mut(*self.analyzing.current_scope).unwrap();
-            let var = scope.new_variable(&mut self.variables, name, var_type);
+            let _ = scope.new_variable(
+                &mut self.variables,
+                name,
+                var_type,
+                name_node.ident().unwrap().text_range(),
+                VariableTag::Define,
+            );
 
             // todo 处理初始化值
         }
@@ -50,7 +56,13 @@ impl Visitor for Module {
             let name = Self::eval_name(&name_node);
 
             let scope = self.scopes.get_mut(*self.analyzing.current_scope).unwrap();
-            let var = scope.new_variable(&mut self.variables, name, var_type);
+            let _ = scope.new_variable(
+                &mut self.variables,
+                name,
+                var_type,
+                name_node.ident().unwrap().text_range(),
+                VariableTag::Define,
+            );
 
             // todo 处理初始化值
         }
@@ -59,18 +71,8 @@ impl Visitor for Module {
     fn enter_func_def(&mut self, node: FuncDef) {
         let ret_ty = Self::eval_func_type_node(&node.func_type().unwrap());
         self.analyzing.current_scope = self.new_scope(Some(self.analyzing.current_scope));
-        let scope = self.scopes.get_mut(*self.analyzing.current_scope).unwrap();
         let params = node.params().unwrap();
-        for param in params.params() {
-            let param_base_type = Self::eval_type_node(&param.ty().unwrap());
-            let pointer_node = param.pointer().unwrap();
-            let param_type = Self::eval_pointer_node(&pointer_node, param_base_type);
-
-            // todo
-
-            let name_node = param.name().unwrap();
-            let name = Self::eval_name(&name_node);
-        }
+        for param in params.params() {}
     }
 
     fn leave_func_def(&mut self, _node: FuncDef) {
@@ -82,28 +84,24 @@ impl Visitor for Module {
             .unwrap();
     }
 
-    fn enter_func_type(&mut self, _node: FuncType) {
-        todo!()
-    }
+    fn leave_func_f_param(&mut self, node: FuncFParam) {
+        let param_base_type = Self::eval_type_node(&node.ty().unwrap());
+        let pointer_node = node.pointer().unwrap();
+        let param_type = Self::eval_pointer_node(&pointer_node, param_base_type);
 
-    fn leave_func_type(&mut self, _node: FuncType) {
-        todo!()
-    }
+        // todo
 
-    fn enter_func_f_params(&mut self, _node: FuncFParams) {
-        todo!()
-    }
+        let name_node = node.name().unwrap();
+        let name = Self::eval_name(&name_node);
 
-    fn leave_func_f_params(&mut self, _node: FuncFParams) {
-        todo!()
-    }
-
-    fn enter_func_f_param(&mut self, _node: FuncFParam) {
-        todo!()
-    }
-
-    fn leave_func_f_param(&mut self, _node: FuncFParam) {
-        todo!()
+        let scope = self.scopes.get_mut(*self.analyzing.current_scope).unwrap();
+        scope.new_variable(
+            &mut self.variables,
+            name,
+            param_type,
+            name_node.ident().unwrap().text_range(),
+            VariableTag::Define,
+        );
     }
 
     fn enter_block(&mut self, _node: Block) {
@@ -170,60 +168,54 @@ impl Visitor for Module {
         todo!()
     }
 
-    fn enter_binary_expr(&mut self, _node: BinaryExpr) {
-        todo!()
+    fn leave_binary_expr(&mut self, node: BinaryExpr) {
+        let lhs = node.lhs().unwrap();
+        let rhs = node.rhs().unwrap();
+        let op = node.op().unwrap();
+        let op_str = op.op().unwrap().text().to_string();
+
+        if self.is_constant(lhs.syntax().text_range())
+            && self.is_constant(rhs.syntax().text_range())
+        {
+            let lhs_val = self.value_table.get(&lhs.syntax().text_range()).unwrap();
+            let rhs_val = self.value_table.get(&rhs.syntax().text_range()).unwrap();
+
+            if let Ok(val) = Value::eval(lhs_val, rhs_val, &op_str) {
+                self.mark_constant(node.syntax().text_range());
+                self.value_table.insert(node.syntax().text_range(), val);
+            }
+        }
     }
 
-    fn leave_binary_expr(&mut self, _node: BinaryExpr) {
-        todo!()
+    fn leave_unary_expr(&mut self, node: UnaryExpr) {
+        let expr = node.expr().unwrap();
+        let op = node.op().unwrap();
+        let op_str = op.op().unwrap().text().to_string();
+
+        if self.is_constant(expr.syntax().text_range()) {
+            let val = self
+                .value_table
+                .get(&expr.syntax().text_range())
+                .unwrap()
+                .clone();
+            if let Ok(res) = Value::eval_unary(val, &op_str) {
+                self.mark_constant(node.syntax().text_range());
+                self.value_table.insert(node.syntax().text_range(), res);
+            }
+        }
     }
 
-    fn enter_unary_expr(&mut self, _node: UnaryExpr) {
-        todo!()
-    }
-
-    fn leave_unary_expr(&mut self, _node: UnaryExpr) {
-        todo!()
-    }
-
-    fn enter_binary_op(&mut self, _node: BinaryOp) {
-        todo!()
-    }
-
-    fn leave_binary_op(&mut self, _node: BinaryOp) {
-        todo!()
-    }
-
-    fn enter_unary_op(&mut self, _node: UnaryOp) {
-        todo!()
-    }
-
-    fn leave_unary_op(&mut self, _node: UnaryOp) {
-        todo!()
-    }
-
-    fn enter_call_expr(&mut self, _node: CallExpr) {
-        todo!()
-    }
-
-    fn leave_call_expr(&mut self, _node: CallExpr) {
-        todo!()
-    }
-
-    fn enter_func_r_params(&mut self, _node: FuncRParams) {
-        todo!()
-    }
-
-    fn leave_func_r_params(&mut self, _node: FuncRParams) {
-        todo!()
-    }
-
-    fn enter_paren_expr(&mut self, _node: ParenExpr) {
-        todo!()
-    }
-
-    fn leave_paren_expr(&mut self, _node: ParenExpr) {
-        todo!()
+    fn leave_paren_expr(&mut self, node: ParenExpr) {
+        let expr = node.expr().unwrap();
+        if self.is_constant(expr.syntax().text_range()) {
+            self.mark_constant(node.syntax().text_range());
+            let val = self
+                .value_table
+                .get(&expr.syntax().text_range())
+                .unwrap()
+                .clone();
+            self.value_table.insert(node.syntax().text_range(), val);
+        }
     }
 
     fn enter_deref_expr(&mut self, _node: DerefExpr) {
@@ -260,28 +252,17 @@ impl Visitor for Module {
         }
     }
 
-    fn enter_literal(&mut self, node: Literal) {}
-
-    fn leave_literal(&mut self, _node: Literal) {
-        todo!()
-    }
-
-    fn enter_type(&mut self, node: Type) {}
-
-    fn enter_name(&mut self, _node: Name) {
-        todo!()
-    }
-
-    fn leave_name(&mut self, _node: Name) {
-        todo!()
-    }
-
-    fn enter_pointer(&mut self, _node: Pointer) {
-        todo!()
-    }
-
-    fn leave_pointer(&mut self, _node: Pointer) {
-        todo!()
+    fn enter_literal(&mut self, node: Literal) {
+        self.mark_constant(node.syntax().text_range());
+        let v = if let Some(n) = node.float_token() {
+            let s = n.text();
+            Value::Float(s.parse::<f32>().unwrap())
+        } else {
+            let n = node.int_token().unwrap();
+            let s = n.text();
+            Value::Int(s.parse::<i32>().unwrap())
+        };
+        self.value_table.insert(node.syntax().text_range(), v);
     }
 }
 
