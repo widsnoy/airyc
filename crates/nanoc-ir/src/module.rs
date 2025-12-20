@@ -1,15 +1,14 @@
 use std::{
     collections::{HashMap, HashSet},
-    env::var,
     ops::Deref,
 };
 
-use text_size::{TextRange, TextSize};
+use text_size::TextRange;
 use thunderdome::Arena;
 
 use crate::ntype::{NType, Value};
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Module {
     pub variables: Arena<Variable>, // 所有 scope 的都存在这里
     pub functions: Arena<Function>,
@@ -19,19 +18,20 @@ pub struct Module {
     // 检查是否是编译期可计算的常量节点
     pub constant_nodes: HashSet<TextRange>,
 
-    // 记录编译时的在值，有的非 const 也可以求
+    // const
     pub value_table: HashMap<TextRange, Value>,
 
     // 分析的时候上下文，使用后清除
     pub(super) analyzing: AnalyzeContext,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub(super) struct AnalyzeContext {
     pub(super) current_scope: ScopeID,
     pub(super) errors: Vec<SemanticError>,
 }
 
+#[derive(Debug)]
 pub enum SemanticError {
     TypeMismatch {
         expected: NType,
@@ -39,6 +39,18 @@ pub enum SemanticError {
         range: TextRange,
     },
     ConstantExprExpected {
+        range: TextRange,
+    },
+    VariableDefined {
+        name: String,
+        range: TextRange,
+    },
+    FunctionDefined {
+        name: String,
+        range: TextRange,
+    },
+    VariableUndefined {
+        name: String,
         range: TextRange,
     },
 }
@@ -77,7 +89,7 @@ impl Module {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct VariableID(pub thunderdome::Index);
 impl VariableID {
     pub fn none() -> Self {
@@ -97,6 +109,7 @@ impl Deref for VariableID {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Variable {
     pub name: String,
     pub ty: NType,
@@ -111,7 +124,7 @@ pub enum VariableTag {
     Read,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct FunctionID(pub thunderdome::Index);
 impl FunctionID {
     pub fn none() -> Self {
@@ -131,13 +144,14 @@ impl Deref for FunctionID {
     }
 }
 
+#[derive(Debug)]
 pub struct Function {
     pub name: String,
     pub params: Vec<VariableID>,
     pub ret_type: NType,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ScopeID(pub thunderdome::Index);
 
 impl ScopeID {
@@ -166,6 +180,7 @@ impl Deref for ScopeID {
     }
 }
 
+#[derive(Debug)]
 pub struct Scope {
     pub parent: Option<ScopeID>,
     pub variables: HashMap<String, HashSet<VariableID>>,
@@ -207,5 +222,29 @@ impl Scope {
             u_opt = u.parent.map(|x| m.scopes.get(*x).unwrap());
         }
         None
+    }
+
+    /// 查找当前作用域的变量
+    pub fn look_up_locally(
+        &self,
+        m: &Module,
+        var_name: &str,
+        var_tag: VariableTag,
+    ) -> Option<VariableID> {
+        if let Some(entry) = self.variables.get(var_name)
+            && let Some(idx) = entry.iter().find(|x| {
+                let var = m.variables.get(***x).unwrap();
+                var.tag == var_tag
+            })
+        {
+            Some(*idx)
+        } else {
+            None
+        }
+    }
+
+    /// 当前作用域是否有变量
+    pub fn have_variable(&self, var_name: &str) -> bool {
+        self.variables.contains_key(var_name)
     }
 }

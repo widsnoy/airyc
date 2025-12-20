@@ -20,7 +20,7 @@ rowan = "0.16.1"
 insta = "1.44.3"
 inkwell = { version = "0.7.1", features = ["llvm19-1"] }
 thunderdome = "0.6.1"
-smol_str = "0.3.4"
+# smol_str = "0.3.4"
 
 
 nanoc-parser = { path = "crates/nanoc-parser" }

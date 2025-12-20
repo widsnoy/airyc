@@ -15,7 +15,7 @@ pub enum NType {
 pub enum Value {
     Int(i32),
     Float(f32),
-    Array(BTreeMap<usize, Value>),
+    Array(Vec<Value>),
     Struct(BTreeMap<String, Value>),
     Symbol(String, i32),
 }
@@ -121,57 +121,20 @@ impl Value {
         }
     }
 
-    /// 获取多维数组或结构体中的元素
-    pub fn get(&self, indices: &[usize]) -> Option<&Value> {
-        let mut cur = self;
-        for &idx in indices {
-            match cur {
-                Value::Array(map) => {
-                    cur = map.get(&idx)?;
-                }
-                _ => return None,
-            }
-        }
-        Some(cur)
-    }
-
-    pub fn get_member(&self, member: &str) -> Option<&Value> {
-        match self {
-            Value::Struct(map) => map.get(member),
-            _ => None,
-        }
-    }
-
-    /// 修改多维数组或结构体中的元素
-    pub fn set(&mut self, indices: &[usize], val: Value) -> Result<(), ()> {
-        if indices.is_empty() {
-            *self = val;
-            return Ok(());
-        }
-
-        let (head, tail) = indices.split_first().unwrap();
-
-        match self {
-            Value::Array(map) => {
-                if tail.is_empty() {
-                    map.insert(*head, val);
-                    Ok(())
-                } else {
-                    let sub = map.get_mut(head).ok_or(())?;
-                    sub.set(tail, val)
-                }
-            }
-            _ => Err(()),
-        }
-    }
-
-    pub fn set_member(&mut self, member: &str, val: Value) -> Result<(), ()> {
-        match self {
-            Value::Struct(map) => {
-                map.insert(member.to_string(), val);
-                Ok(())
-            }
-            _ => Err(()),
-        }
-    }
+    // /// 获取多维数组的元素
+    // pub fn get(&self, indices: &[usize]) -> Option<&Value> {
+    //     let mut cur = self;
+    //     for &idx in indices {
+    //         match cur {
+    //             Value::Array(vec) => {
+    //                 let Some(nxt) = vec.get(idx) else {
+    //                     return None;
+    //                 };
+    //                 cur = nxt;
+    //             }
+    //             _ => return None,
+    //         }
+    //     }
+    //     Some(cur)
+    // }
 }

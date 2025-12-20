@@ -1,7 +1,7 @@
 use nanoc_parser::ast::*;
 use nanoc_parser::visitor::Visitor;
 
-use crate::module::{Module, SemanticError, VariableTag};
+use crate::module::{Function, Module, SemanticError, VariableTag};
 use crate::ntype::{NType, Value};
 
 impl Visitor for Module {
@@ -10,16 +10,15 @@ impl Visitor for Module {
         self.global_scope = self.analyzing.current_scope;
     }
 
-    fn leave_comp_unit(&mut self, _node: CompUnit) {
-        todo!()
-    }
-
     fn leave_const_decl(&mut self, node: ConstDecl) {
         let base_type = Self::eval_type_node(&node.ty().unwrap());
 
         for const_def in node.const_defs() {
-            let pointer_node = const_def.pointer().unwrap();
-            let var_type = Self::eval_pointer_node(&pointer_node, base_type.clone());
+            let var_type = if let Some(pointer_node) = const_def.pointer() {
+                Self::eval_pointer_node(&pointer_node, base_type.clone())
+            } else {
+                base_type.clone()
+            };
 
             let index_val_node = const_def.const_index_val().unwrap();
 
@@ -29,15 +28,39 @@ impl Visitor for Module {
             let name = Self::eval_name(&name_node);
 
             let scope = self.scopes.get_mut(*self.analyzing.current_scope).unwrap();
+
+            if scope.have_variable(&name) {
+                self.analyzing.errors.push(SemanticError::VariableDefined {
+                    name,
+                    range: name_node.syntax().text_range(),
+                });
+                continue;
+            }
+
+            let name_range = name_node.ident().unwrap().text_range();
+
+            if let Some(init_val_node) = const_def.init()
+                && let Some(v) = self
+                    .value_table
+                    .get(&init_val_node.syntax().text_range())
+                    .cloned()
+            {
+                self.value_table.insert(name_range, v);
+            }
+
             let _ = scope.new_variable(
                 &mut self.variables,
                 name,
                 var_type,
-                name_node.ident().unwrap().text_range(),
+                name_range,
                 VariableTag::Define,
             );
+        }
+    }
 
-            // todo 处理初始化值
+    fn leave_const_init_val(&mut self, node: ConstInitVal) {
+        if node.expr().is_none() {
+            todo!("array");
         }
     }
 
@@ -45,8 +68,11 @@ impl Visitor for Module {
         let base_type = Self::eval_type_node(&node.ty().unwrap());
 
         for def in node.var_defs() {
-            let pointer_node = def.pointer().unwrap();
-            let var_type = Self::eval_pointer_node(&pointer_node, base_type.clone());
+            let var_type = if let Some(pointer_node) = def.pointer() {
+                Self::eval_pointer_node(&pointer_node, base_type.clone())
+            } else {
+                base_type.clone()
+            };
 
             let index_val_node = def.const_index_val().unwrap();
 
@@ -56,6 +82,15 @@ impl Visitor for Module {
             let name = Self::eval_name(&name_node);
 
             let scope = self.scopes.get_mut(*self.analyzing.current_scope).unwrap();
+
+            if scope.have_variable(&name) {
+                self.analyzing.errors.push(SemanticError::VariableDefined {
+                    name,
+                    range: name_node.syntax().text_range(),
+                });
+                continue;
+            }
+
             let _ = scope.new_variable(
                 &mut self.variables,
                 name,
@@ -64,37 +99,64 @@ impl Visitor for Module {
                 VariableTag::Define,
             );
 
-            // todo 处理初始化值
+            // todo 处理初始化值，把数组列表展开
         }
     }
 
-    fn enter_func_def(&mut self, node: FuncDef) {
-        let ret_ty = Self::eval_func_type_node(&node.func_type().unwrap());
+    fn enter_func_def(&mut self, _node: FuncDef) {
         self.analyzing.current_scope = self.new_scope(Some(self.analyzing.current_scope));
-        let params = node.params().unwrap();
-        for param in params.params() {}
     }
 
-    fn leave_func_def(&mut self, _node: FuncDef) {
-        self.analyzing.current_scope = self
-            .scopes
-            .get(*self.analyzing.current_scope)
-            .unwrap()
-            .parent
-            .unwrap();
+    fn leave_func_def(&mut self, node: FuncDef) {
+        let scope = self.scopes.get(*self.analyzing.current_scope).unwrap();
+        let mut param_list = Vec::new();
+
+        if let Some(params) = node.params() {
+            for param in params.params() {
+                let name_node = param.name().unwrap();
+                let name = name_node.ident().unwrap();
+                let Some(v) = scope.look_up(&self, name.text(), VariableTag::Define) else {
+                    return;
+                }; // 函数定义是一个 scope
+                param_list.push(v);
+            }
+        }
+
+        let ret_type = Self::eval_func_type_node(&node.func_type().unwrap());
+        let name = node.name().unwrap().ident().unwrap().text().to_string();
+        self.functions.insert(Function {
+            name,
+            params: param_list,
+            ret_type,
+        });
+
+        self.analyzing.current_scope = scope.parent.unwrap();
     }
 
     fn leave_func_f_param(&mut self, node: FuncFParam) {
         let param_base_type = Self::eval_type_node(&node.ty().unwrap());
-        let pointer_node = node.pointer().unwrap();
-        let param_type = Self::eval_pointer_node(&pointer_node, param_base_type);
 
-        // todo
+        let param_type = if let Some(pointer_node) = node.pointer() {
+            Self::eval_pointer_node(&pointer_node, param_base_type)
+        } else {
+            param_base_type
+        };
+
+        // todo:
 
         let name_node = node.name().unwrap();
         let name = Self::eval_name(&name_node);
 
         let scope = self.scopes.get_mut(*self.analyzing.current_scope).unwrap();
+
+        if scope.have_variable(&name) {
+            self.analyzing.errors.push(SemanticError::VariableDefined {
+                name,
+                range: name_node.syntax().text_range(),
+            });
+            return;
+        }
+
         scope.new_variable(
             &mut self.variables,
             name,
@@ -105,15 +167,20 @@ impl Visitor for Module {
     }
 
     fn enter_block(&mut self, _node: Block) {
-        todo!()
+        self.analyzing.current_scope = self.new_scope(Some(self.analyzing.current_scope));
     }
 
     fn leave_block(&mut self, _node: Block) {
-        todo!()
+        self.analyzing.current_scope = self
+            .scopes
+            .get(*self.analyzing.current_scope)
+            .unwrap()
+            .parent
+            .unwrap();
     }
 
     fn enter_assign_stmt(&mut self, _node: AssignStmt) {
-        todo!()
+        todo!("检查类型是否匹配")
     }
 
     fn leave_assign_stmt(&mut self, _node: AssignStmt) {
@@ -172,8 +239,7 @@ impl Visitor for Module {
         let lhs = node.lhs().unwrap();
         let rhs = node.rhs().unwrap();
         let op = node.op().unwrap();
-        let op_str = op.op().unwrap().text().to_string();
-
+        let op_str = op.op();
         if self.is_constant(lhs.syntax().text_range())
             && self.is_constant(rhs.syntax().text_range())
         {
@@ -190,7 +256,7 @@ impl Visitor for Module {
     fn leave_unary_expr(&mut self, node: UnaryExpr) {
         let expr = node.expr().unwrap();
         let op = node.op().unwrap();
-        let op_str = op.op().unwrap().text().to_string();
+        let op_str = op.op();
 
         if self.is_constant(expr.syntax().text_range()) {
             let val = self
@@ -226,21 +292,45 @@ impl Visitor for Module {
         todo!()
     }
 
-    fn enter_index_val(&mut self, _node: IndexVal) {
-        todo!()
+    // fn enter_index_val(&mut self, _node: IndexVal) {
+    //     todo!()
+    // }
+
+    fn leave_index_val(&mut self, node: IndexVal) {
+        let ident_token = node.name().unwrap().ident().unwrap();
+        let var_name = ident_token.text();
+        let scope = self.scopes.get(*self.analyzing.current_scope).unwrap();
+        let Some(v) = scope.look_up(&self, var_name, VariableTag::Define) else {
+            self.analyzing
+                .errors
+                .push(SemanticError::VariableUndefined {
+                    name: var_name.to_string(),
+                    range: ident_token.text_range(),
+                });
+            return;
+        };
+        let v = self.variables.get(*v).unwrap();
+        let Some(value) = self.value_table.get(&v.range) else {
+            self.analyzing
+                .errors
+                .push(SemanticError::ConstantExprExpected {
+                    range: ident_token.text_range(),
+                });
+            return;
+        };
+        // todo: array...
+        let range = node.syntax().text_range();
+        self.value_table.insert(range, value.clone());
+        self.mark_constant(range);
     }
 
-    fn leave_index_val(&mut self, _node: IndexVal) {
-        todo!()
-    }
+    // fn enter_const_index_val(&mut self, _node: ConstIndexVal) {
 
-    fn enter_const_index_val(&mut self, _node: ConstIndexVal) {
-        todo!()
-    }
+    // }
 
-    fn leave_const_index_val(&mut self, _node: ConstIndexVal) {
-        todo!()
-    }
+    // fn leave_const_index_val(&mut self, _node: ConstIndexVal) {
+
+    // }
 
     fn leave_const_expr(&mut self, node: ConstExpr) {
         let expr = node.expr().unwrap();
@@ -303,8 +393,12 @@ impl Module {
             NType::Void
         } else {
             let base_type = Self::eval_type_node(&node.ty().unwrap());
-            let pointer_node = node.pointer().unwrap();
-            Self::eval_pointer_node(&pointer_node, base_type)
+
+            if let Some(pointer_node) = node.pointer() {
+                Self::eval_pointer_node(&pointer_node, base_type)
+            } else {
+                base_type
+            }
         }
     }
 }

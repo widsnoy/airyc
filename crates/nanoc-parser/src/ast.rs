@@ -279,12 +279,31 @@ ast_node!(
     }
 );
 
-ast_node!(BinaryOp ~ BINARY_OP {
-    op: token(BINARY_OP)
-});
-ast_node!(UnaryOp ~ UNARY_OP {
-    op: token(UNARY_OP)
-});
+ast_node!(BinaryOp ~ BINARY_OP {});
+
+impl BinaryOp {
+    pub fn op(&self) -> String {
+        let token = self
+            .syntax
+            .children_with_tokens()
+            .find_map(|t| t.into_token().filter(|t| !t.kind().is_trivia()))
+            .expect("impossible");
+        token.text().to_string()
+    }
+}
+
+ast_node!(UnaryOp ~ UNARY_OP {});
+
+impl UnaryOp {
+    pub fn op(&self) -> String {
+        let token = self
+            .syntax
+            .children_with_tokens()
+            .find_map(|t| t.into_token().filter(|t| !t.kind().is_trivia()))
+            .expect("impossible");
+        token.text().to_string()
+    }
+}
 
 ast_node!(
     CallExpr ~ CALL_EXPR {
