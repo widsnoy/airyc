@@ -1,0 +1,28 @@
+[config]
+default_to_workspace = false
+
+[tasks.default]
+alias = "build"
+
+[tasks.build]
+dependencies = ["build-compiler", "build-runtime"]
+
+[tasks.build-compiler]
+command = "cargo"
+args = ["build", "--release", "--bin", "nanoc-compiler"]
+
+[tasks.build-runtime]
+command = "cargo"
+args = ["build", "--release", "-p", "nanoc-runtime"]
+
+[tasks.run]
+script_runner = "@shell"
+# dependencies = ["build"]
+script = '''
+if [ -z "$1" ]; then
+    echo "Usage: cargo make run -- <source_file.nnc>"
+    exit 1
+fi
+NAME=$1
+echo $NAME
+'''

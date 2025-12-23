@@ -1,27 +1,23 @@
+use std::env;
+use std::fs;
+use std::path::Path;
+
 use inkwell::context::Context;
 use nanoc_codegen::llvm_ir::Program;
 use nanoc_parser::ast::{AstNode, CompUnit};
 
 fn main() {
-    // let mut input = String::new();
-    // io::stdin().read_to_string(&mut input).unwrap();
-
-    let input = r#"
-    void print(int x) {
-        if (x) {
-            233;
-        } else {
-            666;
-         }
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        eprintln!("Usage: {} <input_file> [-o <output_file>]", args[0]);
+        return;
     }
 
-    int main() {
-        print(233);
-        return 0;
-    }
-    "#;
+    let input_path = &args[1];
+    let input = fs::read_to_string(input_path).expect("Failed to read input file");
 
-    let parser = nanoc_parser::parser::Parser::new(input);
+    // 1. Parse
+    let parser = nanoc_parser::parser::Parser::new(&input);
     let (green_node, errors) = parser.parse();
     if !errors.is_empty() {
         eprintln!("Parser errors:");
@@ -32,10 +28,16 @@ fn main() {
     }
 
     let root = nanoc_parser::parser::Parser::new_root(green_node);
-    let comp_unit = CompUnit::cast(root.clone()).expect("Root node is not CompUnit");
+    let comp_unit = CompUnit::cast(root).expect("Root node is not CompUnit");
 
+    // 2. Codegen (LLVM IR)
     let context = Context::create();
-    let module = context.create_module("main");
+    // Use filename as module name
+    let module_name = Path::new(input_path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("main");
+    let module = context.create_module(module_name);
     let builder = context.create_builder();
 
     let mut program = Program {
@@ -51,5 +53,21 @@ fn main() {
 
     program.compile_comp_unit(comp_unit);
 
-    program.module.print_to_stderr();
+    // 3. Write LLVM IR to file
+    let output_path = if let Some(idx) = args.iter().position(|x| x == "-o") {
+        if idx + 1 < args.len() {
+            Path::new(&args[idx + 1]).to_path_buf()
+        } else {
+            Path::new(input_path).with_extension("ll")
+        }
+    } else {
+        Path::new(input_path).with_extension("ll")
+    };
+
+    program
+        .module
+        .print_to_file(&output_path)
+        .expect("Failed to write LLVM IR");
+
+    println!("Generated LLVM IR: {}", output_path.display());
 }

@@ -88,7 +88,43 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
         builder.build_alloca(ty, name).expect("创建 alloca 失败")
     }
 
+    fn declare_sysy_runtime(&self) {
+        let i32_type = self.context.i32_type();
+        let void_type = self.context.void_type();
+        let i32_ptr_type = self.context.ptr_type(inkwell::AddressSpace::default());
+
+        // int getint()
+        let fn_type = i32_type.fn_type(&[], false);
+        self.module.add_function("getint", fn_type, None);
+
+        // int getch()
+        self.module.add_function("getch", fn_type, None);
+
+        // int getarray(int a[])
+        let fn_type = i32_type.fn_type(&[i32_ptr_type.into()], false);
+        self.module.add_function("getarray", fn_type, None);
+
+        // void putint(int a)
+        let fn_type = void_type.fn_type(&[i32_type.into()], false);
+        self.module.add_function("putint", fn_type, None);
+
+        // void putch(int a)
+        self.module.add_function("putch", fn_type, None);
+
+        // void putarray(int n, int a[])
+        let fn_type = void_type.fn_type(&[i32_type.into(), i32_ptr_type.into()], false);
+        self.module.add_function("putarray", fn_type, None);
+
+        // void starttime()
+        let fn_type = void_type.fn_type(&[], false);
+        self.module.add_function("starttime", fn_type, None);
+
+        // void stoptime()
+        self.module.add_function("stoptime", fn_type, None);
+    }
+
     pub fn compile_comp_unit(&mut self, node: CompUnit) {
+        self.declare_sysy_runtime();
         for global in node.global_decls() {
             match global {
                 GlobalDecl::Decl(decl) => self.compile_global_decl(decl),
