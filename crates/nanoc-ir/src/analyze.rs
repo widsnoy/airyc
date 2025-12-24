@@ -115,7 +115,7 @@ impl Visitor for Module {
             for param in params.params() {
                 let name_node = param.name().unwrap();
                 let name = name_node.ident().unwrap();
-                let Some(v) = scope.look_up(&self, name.text(), VariableTag::Define) else {
+                let Some(v) = scope.look_up(self, name.text(), VariableTag::Define) else {
                     return;
                 }; // 函数定义是一个 scope
                 param_list.push(v);
@@ -300,7 +300,7 @@ impl Visitor for Module {
         let ident_token = node.name().unwrap().ident().unwrap();
         let var_name = ident_token.text();
         let scope = self.scopes.get(*self.analyzing.current_scope).unwrap();
-        let Some(v) = scope.look_up(&self, var_name, VariableTag::Define) else {
+        let Some(v) = scope.look_up(self, var_name, VariableTag::Define) else {
             self.analyzing
                 .errors
                 .push(SemanticError::VariableUndefined {
@@ -354,9 +354,9 @@ impl Visitor for Module {
                 Some('0') => match s.chars().nth(1) {
                     Some('x') | Some('X') => (&s[2..], 16),
                     Some(_) => (&s[1..], 8),
-                    None => (&s[..], 10),
+                    None => (s, 10),
                 },
-                _ => (&s[..], 10),
+                _ => (s, 10),
             };
             Value::Int(i32::from_str_radix(num_str, radix).unwrap())
         };
