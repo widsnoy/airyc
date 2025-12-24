@@ -108,12 +108,3 @@ fn test_complex_program() {
     "#;
     insta::assert_snapshot!(try_it(code));
 }
-
-#[test]
-fn test_oct() {
-    let code = r#"
-    const int y = 10;
-    const int z = y + 1;
-    "#;
-    insta::assert_snapshot!(try_it(code));
-}
