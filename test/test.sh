@@ -28,9 +28,8 @@ for i in "$@"; do
         rm $PLAY_GROUND/std.out
 
         $my_compiler $i -o $PLAY_GROUND/$name.ll
-
         if [ $? -ne 0 ]; then
-            break
+            exit 1
         fi
 
         clang -x ir $PLAY_GROUND/$name.ll -c -o $PLAY_GROUND/$name.o
