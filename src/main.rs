@@ -64,6 +64,10 @@ fn main() {
     let comp_unit = CompUnit::cast(root).expect("Root node is not CompUnit");
     program.compile_comp_unit(comp_unit);
 
+    if let Err(e) = module.verify() {
+        panic!("{:?}", e);
+    }
+
     Target::initialize_all(&InitializationConfig::default());
     let triple = TargetTriple::create("x86_64-pc-linux-gnu");
     let target = Target::from_triple(&triple).expect("Failed to get target from triple");
