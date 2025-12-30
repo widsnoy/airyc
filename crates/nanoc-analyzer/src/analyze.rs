@@ -12,7 +12,7 @@ impl Visitor for Module {
     }
 
     fn enter_const_decl(&mut self, node: ConstDecl) {
-        self.analyzing.current_base_type = Some(NType::Const(Box::new(Self::eval_type_node(
+        self.analyzing.current_base_type = Some(NType::Const(Box::new(Self::build_basic_type(
             &node.ty().unwrap(),
         ))));
     }
@@ -20,7 +20,7 @@ impl Visitor for Module {
     fn leave_const_def(&mut self, const_def: ConstDef) {
         let base_type = self.analyzing.current_base_type.clone().unwrap();
         let var_type = if let Some(pointer_node) = const_def.pointer() {
-            Self::eval_pointer_node(&pointer_node, base_type.clone())
+            Self::build_pointer_type(&pointer_node, base_type.clone())
         } else {
             base_type.clone()
         };
@@ -30,7 +30,7 @@ impl Visitor for Module {
         // todo 这里需要先把常数下标算出来
 
         let name_node = index_val_node.name().unwrap();
-        let name = Self::eval_name(&name_node);
+        let name = Self::extract_name(&name_node);
 
         let scope = self.scopes.get_mut(*self.analyzing.current_scope).unwrap();
 
@@ -69,13 +69,13 @@ impl Visitor for Module {
     fn leave_const_init_val(&mut self, _node: ConstInitVal) {}
 
     fn enter_var_decl(&mut self, node: VarDecl) {
-        self.analyzing.current_base_type = Some(Self::eval_type_node(&node.ty().unwrap()));
+        self.analyzing.current_base_type = Some(Self::build_basic_type(&node.ty().unwrap()));
     }
 
     fn leave_var_def(&mut self, def: VarDef) {
         let base_type = self.analyzing.current_base_type.clone().unwrap();
         let var_type = if let Some(pointer_node) = def.pointer() {
-            Self::eval_pointer_node(&pointer_node, base_type.clone())
+            Self::build_pointer_type(&pointer_node, base_type.clone())
         } else {
             base_type.clone()
         };
@@ -83,7 +83,7 @@ impl Visitor for Module {
         let index_val_node = def.const_index_val().unwrap();
 
         let name_node = index_val_node.name().unwrap();
-        let name = Self::eval_name(&name_node);
+        let name = Self::extract_name(&name_node);
         let range = name_node.ident().unwrap().text_range();
         let scope = self.scopes.get_mut(*self.analyzing.current_scope).unwrap();
 
@@ -124,7 +124,7 @@ impl Visitor for Module {
             }
         }
 
-        let ret_type = Self::eval_func_type_node(&node.func_type().unwrap());
+        let ret_type = Self::build_func_type(&node.func_type().unwrap());
         let name = node.name().unwrap().ident().unwrap().text().to_string();
         self.functions.insert(Function {
             name,
@@ -136,18 +136,16 @@ impl Visitor for Module {
     }
 
     fn leave_func_f_param(&mut self, node: FuncFParam) {
-        let param_base_type = Self::eval_type_node(&node.ty().unwrap());
+        let param_base_type = Self::build_basic_type(&node.ty().unwrap());
 
         let param_type = if let Some(pointer_node) = node.pointer() {
-            Self::eval_pointer_node(&pointer_node, param_base_type)
+            Self::build_pointer_type(&pointer_node, param_base_type)
         } else {
             param_base_type
         };
 
-        // todo:
-
         let name_node = node.name().unwrap();
-        let name = Self::eval_name(&name_node);
+        let name = Self::extract_name(&name_node);
         let range = name_node.ident().unwrap().text_range();
         let scope = self.scopes.get_mut(*self.analyzing.current_scope).unwrap();
 
@@ -335,20 +333,20 @@ impl Visitor for Module {
 }
 
 impl Module {
-    fn eval_type_node(node: &Type) -> NType {
+    pub(crate) fn build_basic_type(node: &Type) -> NType {
         if node.int_token().is_some() {
             NType::Int
         } else if node.float_token().is_some() {
             NType::Float
         } else if node.struct_token().is_some() {
-            let name = Self::eval_name(&node.name().unwrap());
+            let name = Self::extract_name(&node.name().unwrap());
             NType::Struct(name)
         } else {
             unreachable!("未知类型节点")
         }
     }
 
-    fn eval_pointer_node(node: &Pointer, base_type: NType) -> NType {
+    pub(crate) fn build_pointer_type(node: &Pointer, base_type: NType) -> NType {
         let res = node.stars();
         let mut ty = base_type;
         for b in res {
@@ -360,23 +358,41 @@ impl Module {
         ty
     }
     /// 从 Name 节点提取变量名
-    fn eval_name(node: &Name) -> String {
+    pub(crate) fn extract_name(node: &Name) -> String {
         node.ident()
             .map(|t| t.text().to_string())
             .expect("获取标识符失败")
     }
 
-    fn eval_func_type_node(node: &FuncType) -> NType {
+    pub(crate) fn build_func_type(node: &FuncType) -> NType {
         if node.void_token().is_some() {
             NType::Void
         } else {
-            let base_type = Self::eval_type_node(&node.ty().unwrap());
+            let base_type = Self::build_basic_type(&node.ty().unwrap());
 
             if let Some(pointer_node) = node.pointer() {
-                Self::eval_pointer_node(&pointer_node, base_type)
+                Self::build_pointer_type(&pointer_node, base_type)
             } else {
                 base_type
             }
         }
+    }
+
+    pub(crate) fn _build_array_type(
+        &self,
+        basic_type: NType,
+        node: &ConstIndexVal,
+    ) -> Option<NType> {
+        let mut ty = basic_type;
+        let mut indices_rev = node.indices().collect::<Vec<ConstExpr>>();
+        indices_rev.reverse();
+        for expr in indices_rev {
+            let x = self.get_value(&expr.syntax().text_range()).cloned()?;
+            let Value::Int(y) = x else {
+                return None;
+            };
+            ty = NType::Array(Box::new(ty), y);
+        }
+        Some(ty)
     }
 }

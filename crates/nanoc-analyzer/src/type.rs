@@ -3,7 +3,7 @@ pub enum NType {
     Int,
     Float,
     Void,
-    Array(Box<NType>, usize),
+    Array(Box<NType>, i32),
     Pointer(Box<NType>),
     Struct(String),
     Const(Box<NType>),
