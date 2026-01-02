@@ -19,7 +19,7 @@ jobs:
         with:
           submodules: recursive
       - name: Log
-        run: whoami
+        run: rustup default stable
       - name: Cargo fmt
         run: cargo fmt --all -- --check
       - name: Cargo clippy
