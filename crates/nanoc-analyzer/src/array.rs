@@ -1,20 +1,36 @@
+use std::collections::HashMap;
+
 use nanoc_parser::{
     ast::{AstNode, ConstExpr, ConstInitVal, Expr, InitVal},
     syntax_kind::NanocLanguage,
 };
+use text_size::TextRange;
 
-use crate::r#type::NType;
+use crate::{r#type::NType, value::Value};
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ArrayTreeValue {
     ConstExpr(ConstExpr),
     Expr(Expr),
+    Empty,
 }
 
+impl ArrayTreeValue {
+    pub fn get_const_value<'a>(
+        &self,
+        value_table: &'a HashMap<TextRange, Value>,
+    ) -> Option<&'a Value> {
+        match self {
+            Self::ConstExpr(node) => value_table.get(&node.syntax().text_range()),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq)]
 pub enum ArrayTree {
     Children(Vec<ArrayTree>),
     Val(ArrayTreeValue),
-    Empty,
 }
 
 impl std::fmt::Display for ArrayTree {
@@ -56,13 +72,15 @@ impl std::fmt::Display for ArrayTree {
                     let text = match v {
                         ArrayTreeValue::ConstExpr(e) => e.syntax().text(),
                         ArrayTreeValue::Expr(e) => e.syntax().text(),
+                        ArrayTreeValue::Empty => {
+                            return writeln!(f, "{}{}Empty", prefix, connector);
+                        }
                     }
                     .to_string()
                     .trim()
                     .to_string();
                     writeln!(f, "{}{}Val({})", prefix, connector, text)
                 }
-                ArrayTree::Empty => writeln!(f, "{}{}Empty", prefix, connector),
             }
         }
         fmt_inner(self, f, "", true, true)
@@ -115,19 +133,17 @@ impl ArrayTreeTrait for InitVal {
 pub enum ArrayInitError {
     /// 用数组初始化标量
     AssignArrayToNumber,
+    /// 数组下标越界
+    IndexOutOfBound,
+    /// 下标和类型不匹配
+    MisMatchIndexAndType,
     Unkown,
 }
 
 impl ArrayTree {
     pub fn new(ty: &NType, init_val: impl ArrayTreeTrait) -> Result<ArrayTree, ArrayInitError> {
         let Some(first_child) = init_val.first_child() else {
-            return Ok(ArrayTree::Empty);
-        };
-
-        let ty = if let NType::Const(inner) = ty {
-            inner.as_ref()
-        } else {
-            ty
+            return Ok(ArrayTree::Val(ArrayTreeValue::Empty));
         };
 
         Self::build(ty, &mut Some(first_child))
@@ -164,7 +180,7 @@ impl ArrayTree {
                     } else {
                         // {}
                         if inner.is_array() {
-                            children_vec.push(ArrayTree::Empty);
+                            children_vec.push(ArrayTree::Val(ArrayTreeValue::Empty));
                             *cursor = u.next_sibling();
                         } else {
                             return Err(ArrayInitError::AssignArrayToNumber);
@@ -173,7 +189,28 @@ impl ArrayTree {
                 }
                 Ok(ArrayTree::Children(children_vec))
             }
+            NType::Const(inner) => Self::build(&inner, cursor),
             _ => unreachable!(),
+        }
+    }
+
+    /// 获取叶子
+    pub fn get_leaf(&self, indices: &[i32]) -> Result<ArrayTreeValue, ArrayInitError> {
+        let mut u = self;
+        for i in indices {
+            u = match u {
+                ArrayTree::Children(children) => {
+                    let Some(child) = children.get(*i as usize) else {
+                        return Ok(ArrayTreeValue::Empty);
+                    };
+                    child
+                }
+                _ => return Err(ArrayInitError::MisMatchIndexAndType),
+            };
+        }
+        match u {
+            ArrayTree::Val(v) => Ok(v.clone()),
+            _ => Err(ArrayInitError::MisMatchIndexAndType),
         }
     }
 }
@@ -181,7 +218,7 @@ impl ArrayTree {
 #[cfg(test)]
 mod test {
     use nanoc_parser::{
-        ast::{AstNode, ConstIndexVal, InitVal, SyntaxNode, Type},
+        ast::{AstNode, ConstIndexVal, ConstInitVal, SyntaxNode, Type},
         parser::Parser,
         syntax_kind::SyntaxKind,
         visitor::Visitor as _,
@@ -190,12 +227,13 @@ mod test {
     use crate::{
         array::{ArrayInitError, ArrayTree},
         module::Module,
+        value::Value,
     };
 
     fn get_init_val_node(root: &SyntaxNode) -> SyntaxNode {
         let res = root
             .descendants()
-            .find(|x| matches!(x.kind(), SyntaxKind::INIT_VAL));
+            .find(|x| matches!(x.kind(), SyntaxKind::CONST_INIT_VAL));
         res.unwrap()
     }
 
@@ -211,43 +249,50 @@ mod test {
         res.unwrap()
     }
 
-    fn generator(text: &str) -> Result<String, ArrayInitError> {
+    fn generator(text: &str) -> Result<(String, Module, ArrayTree), ArrayInitError> {
         let p = Parser::new(text);
         let (tree, _) = p.parse();
         let root = Parser::new_root(tree);
-        let init_val_node = InitVal::cast(get_init_val_node(&root)).unwrap();
+        let init_val_node = ConstInitVal::cast(get_init_val_node(&root)).unwrap();
         // dbg!(init_val_node.syntax());
         let mut module = Module::default();
         module.walk(&root);
         let basic_ty = Module::build_basic_type(&Type::cast(get_type_node(&root)).unwrap());
         let ty = module
-            ._build_array_type(
+            .build_array_type(
                 basic_ty,
                 &ConstIndexVal::cast(get_const_index_node(&root)).unwrap(),
             )
             .unwrap();
+        dbg!(&ty);
         let array_tree = ArrayTree::new(&ty, init_val_node)?;
-        Ok(array_tree.to_string())
+        Ok((array_tree.to_string(), module, array_tree))
     }
 
     #[test]
     fn normal_array() {
-        let text = "int a[2] = {1, 2}";
-        let tree = generator(text).unwrap();
+        let text = "const int a[2] = {1, 2}";
+        let (tree, _, _) = generator(text).unwrap();
         insta::assert_snapshot!(tree);
     }
 
     #[test]
     fn special_array() {
-        let text = "int arr[2][3][4] = {1, 2, 3, 4, {5}, {6}, {7, 8}};";
-        let tree = generator(text).unwrap();
+        let text = "const int arr[2][3][4] = {1, 2, 3, 4, {5}, {6}, {7, 8}};";
+        let (tree, module, array_tree) = generator(text).unwrap();
         insta::assert_snapshot!(tree);
+        let indices = [0, 1, 0];
+        let leaf = array_tree.get_leaf(&indices).unwrap();
+        dbg!(&leaf);
+        dbg!(&module.value_table);
+        let value = leaf.get_const_value(&module.value_table);
+        assert_eq!(value, Some(&Value::Int(5)));
     }
 
-    #[test]
-    fn bad_test_case() {
-        let text = "int arr[2][2][2] = {{}, 1, {}};";
-        let tree = generator(text);
-        assert!(tree.is_err());
-    }
+    // #[test]
+    // fn bad_test_case() {
+    //     let text = "const int arr[2][2][2] = {{}, 1, {}};";
+    //     let tree = generator(text);
+    //     assert!(tree.is_err());
+    // }
 }

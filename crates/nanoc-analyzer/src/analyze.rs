@@ -1,6 +1,7 @@
 use nanoc_parser::ast::*;
 use nanoc_parser::visitor::Visitor;
 
+use crate::array::ArrayTree;
 use crate::module::{Function, Module, SemanticError, VariableTag};
 use crate::r#type::NType;
 use crate::value::Value;
@@ -20,15 +21,13 @@ impl Visitor for Module {
     fn leave_const_def(&mut self, const_def: ConstDef) {
         let base_type = self.analyzing.current_base_type.clone().unwrap();
         let var_type = if let Some(pointer_node) = const_def.pointer() {
-            Self::build_pointer_type(&pointer_node, base_type.clone())
+            Self::build_pointer_type(&pointer_node, base_type)
         } else {
-            base_type.clone()
+            base_type
         };
 
         let index_val_node = const_def.const_index_val().unwrap();
-
-        // todo 这里需要先把常数下标算出来
-
+        let var_type = self.build_array_type(var_type, &index_val_node).unwrap();
         let name_node = index_val_node.name().unwrap();
         let name = Self::extract_name(&name_node);
 
@@ -43,20 +42,40 @@ impl Visitor for Module {
             return;
         }
 
-        let Some(init_val_node) = const_def.init() else {
+        let Some(const_init_val_node) = const_def.init() else {
             self.analyzing
                 .errors
                 .push(SemanticError::ExpectInitialVal { name, range });
             return;
         };
 
-        if let Some(v) = self
-            .value_table
-            .get(&init_val_node.syntax().text_range())
-            .cloned()
-        {
-            self.value_table.insert(range, v);
-        }
+        // 处理初始化值
+        let init_value = match var_type {
+            NType::Array(_, _) => {
+                let range = const_init_val_node.syntax().text_range();
+                let array_tree = ArrayTree::new(&var_type, const_init_val_node).unwrap(); // 错误处理之后做...
+                self.expand_array.insert(range, array_tree.clone());
+                Value::Array(array_tree)
+            }
+            _ => {
+                let Some(init_value) = self
+                    .value_table
+                    .get(&const_init_val_node.syntax().text_range())
+                    .cloned()
+                else {
+                    self.analyzing
+                        .errors
+                        .push(SemanticError::ExpectInitialVal { name, range });
+                    return;
+                };
+                init_value
+            }
+        };
+
+        self.value_table.insert(range, init_value);
+
+        // 检查初始值类型是否匹配
+
         let _ = scope.new_variable(
             &mut self.variables,
             name,
@@ -65,8 +84,6 @@ impl Visitor for Module {
             VariableTag::Define,
         );
     }
-
-    fn leave_const_init_val(&mut self, _node: ConstInitVal) {}
 
     fn enter_var_decl(&mut self, node: VarDecl) {
         self.analyzing.current_base_type = Some(Self::build_basic_type(&node.ty().unwrap()));
@@ -75,14 +92,16 @@ impl Visitor for Module {
     fn leave_var_def(&mut self, def: VarDef) {
         let base_type = self.analyzing.current_base_type.clone().unwrap();
         let var_type = if let Some(pointer_node) = def.pointer() {
-            Self::build_pointer_type(&pointer_node, base_type.clone())
+            Self::build_pointer_type(&pointer_node, base_type)
         } else {
-            base_type.clone()
+            base_type
         };
 
-        let index_val_node = def.const_index_val().unwrap();
-
-        let name_node = index_val_node.name().unwrap();
+        let const_index_val_node = def.const_index_val().unwrap();
+        let var_type = self
+            .build_array_type(var_type, &const_index_val_node)
+            .unwrap();
+        let name_node = const_index_val_node.name().unwrap();
         let name = Self::extract_name(&name_node);
         let range = name_node.ident().unwrap().text_range();
         let scope = self.scopes.get_mut(*self.analyzing.current_scope).unwrap();
@@ -94,6 +113,14 @@ impl Visitor for Module {
             return;
         }
 
+        if let Some(init_val_node) = def.init()
+            && var_type.is_array()
+        {
+            let array_tree = ArrayTree::new(&var_type, init_val_node).unwrap();
+            self.expand_array
+                .insert(const_index_val_node.syntax().text_range(), array_tree);
+        }
+
         let _ = scope.new_variable(
             &mut self.variables,
             name,
@@ -101,8 +128,6 @@ impl Visitor for Module {
             range,
             VariableTag::Define,
         );
-
-        // todo 处理初始化值，把数组列表展开
     }
 
     fn enter_func_def(&mut self, _node: FuncDef) {
@@ -292,14 +317,6 @@ impl Visitor for Module {
         self.mark_constant(range);
     }
 
-    // fn enter_const_index_val(&mut self, _node: ConstIndexVal) {
-
-    // }
-
-    // fn leave_const_index_val(&mut self, _node: ConstIndexVal) {
-
-    // }
-
     fn leave_const_expr(&mut self, node: ConstExpr) {
         let expr = node.expr().unwrap();
         let range = expr.syntax().text_range();
@@ -378,7 +395,7 @@ impl Module {
         }
     }
 
-    pub(crate) fn _build_array_type(
+    pub(crate) fn build_array_type(
         &self,
         basic_type: NType,
         node: &ConstIndexVal,
