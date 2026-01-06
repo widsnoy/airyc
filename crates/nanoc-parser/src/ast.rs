@@ -150,6 +150,11 @@ ast_node!(
         inits: nodes(InitVal),
     }
 );
+impl InitVal {
+    pub fn is_list(&self) -> bool {
+        self.inits().next().is_some()
+    }
+}
 
 // 3. Functions
 ast_node!(

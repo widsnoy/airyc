@@ -104,6 +104,7 @@ impl Visitor for Module {
         self.analyzing.current_base_type = Some(Self::build_basic_type(&node.ty().unwrap()));
     }
 
+    // todo: 先检查左右两边是不是对应的
     fn leave_var_def(&mut self, def: VarDef) {
         let base_type = self.analyzing.current_base_type.clone().unwrap();
         let var_type = if let Some(pointer_node) = def.pointer() {
@@ -129,23 +130,19 @@ impl Visitor for Module {
         }
 
         if let Some(init_val_node) = def.init() {
+            let range = init_val_node.syntax().text_range();
             if self.global_scope == self.analyzing.current_scope
-                && !self
-                    .constant_nodes
-                    .contains(&init_val_node.syntax().text_range())
+                && !self.constant_nodes.contains(&range)
             {
                 self.analyzing
                     .errors
-                    .push(SemanticError::ConstantExprExpected {
-                        range: init_val_node.syntax().text_range(),
-                    });
+                    .push(SemanticError::ConstantExprExpected { range });
                 return;
             }
 
             if var_type.is_array() {
                 let array_tree = ArrayTree::new(&var_type, init_val_node).unwrap();
-                self.expand_array
-                    .insert(const_index_val_node.syntax().text_range(), array_tree);
+                self.expand_array.insert(range, array_tree);
             }
         }
 

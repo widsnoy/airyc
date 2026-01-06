@@ -144,6 +144,13 @@ fn test_array_initialize() {
     
     const float d[2] = {1.11};
     float e = d[0];
+
+    int g[2] = {1, 2};
+
+    int main() {
+        int a[3] = {1, 2, 3};
+        int b[2] = {1, a[1]};
+    }
     "#;
     insta::assert_snapshot!(try_it(code));
 }

@@ -1,16 +1,17 @@
-use core::panic;
+use std::collections::HashMap;
 
+use inkwell::basic_block::BasicBlock;
 use inkwell::types::{BasicType, BasicTypeEnum};
-use inkwell::values::{BasicValueEnum, IntValue};
+use inkwell::values::{BasicValueEnum, FunctionValue, IntValue, PointerValue};
 use nanoc_analyzer::array::ArrayTree;
 use nanoc_analyzer::r#type::NType;
 use nanoc_analyzer::value::Value;
-use nanoc_parser::ast::{AstNode, ConstIndexVal, Name, SyntaxToken};
+use nanoc_parser::ast::{AstNode, ConstIndexVal, IndexVal, Name, SyntaxToken};
 
-use crate::llvm_ir::Program;
+use crate::llvm_ir::{LoopContext, Program};
 
 // /// 统计指针星号数量
-// pub fn pointer_depth(ptr: &Pointer) -> usize {
+// pub(crate) fn pointer_depth(ptr: &Pointer) -> usize {
 //     ptr.syntax()
 //         .children_with_tokens()
 //         .filter_map(|it| it.into_token())
@@ -20,7 +21,7 @@ use crate::llvm_ir::Program;
 
 // /// 给基本类型套上指针层级
 // #[allow(deprecated)]
-// pub fn apply_pointer<'ctx>(
+// pub(crate) fn apply_pointer<'ctx>(
 //     base: BasicTypeEnum<'ctx>,
 //     pointer: Option<Pointer>,
 // ) -> BasicTypeEnum<'ctx> {
@@ -32,18 +33,116 @@ use crate::llvm_ir::Program;
 // }
 
 /// 提取变量定义中的 ident token  
-pub fn get_ident_node(name: &ConstIndexVal) -> SyntaxToken {
+pub(crate) fn get_ident_node(name: &ConstIndexVal) -> SyntaxToken {
     name.name().and_then(|n| n.ident()).unwrap()
 }
 
 /// 提取普通名字
-pub fn name_text(name: &Name) -> String {
+pub(crate) fn name_text(name: &Name) -> String {
     name.ident().map(|t| t.text().to_string()).unwrap()
 }
 
 impl<'a, 'ctx> Program<'a, 'ctx> {
+    /// 新作用域
+    pub(crate) fn push_scope(&mut self) {
+        self.scopes.push(HashMap::new());
+    }
+
+    /// 离开作用域
+    pub(crate) fn pop_scope(&mut self) {
+        self.scopes.pop();
+    }
+
+    pub(crate) fn push_loop(&mut self, cond_bb: BasicBlock<'ctx>, end_bb: BasicBlock<'ctx>) {
+        self.loop_stack.push(LoopContext { cond_bb, end_bb });
+    }
+
+    pub(crate) fn pop_loop(&mut self) {
+        self.loop_stack.pop();
+    }
+
+    /// 插入局部变量
+    pub(crate) fn insert_var(
+        &mut self,
+        name: String,
+        ptr: PointerValue<'ctx>,
+        ty: BasicTypeEnum<'ctx>,
+    ) {
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.insert(name, (ptr, ty));
+        }
+    }
+
+    /// 查找变量（从内到外）
+    pub(crate) fn lookup_var(
+        &self,
+        name: &str,
+    ) -> Option<(PointerValue<'ctx>, BasicTypeEnum<'ctx>)> {
+        for scope in self.scopes.iter().rev() {
+            if let Some(p) = scope.get(name) {
+                return Some(*p);
+            }
+        }
+        if let Some(g) = self.globals.get(name) {
+            return Some(*g);
+        }
+        None
+    }
+
+    /// 在基本块分配局部变量
+    pub(crate) fn create_entry_alloca(
+        &self,
+        function: FunctionValue<'ctx>,
+        ty: BasicTypeEnum<'ctx>,
+        name: &str,
+    ) -> PointerValue<'ctx> {
+        let entry = function.get_first_basic_block().unwrap();
+        let builder = self.context.create_builder();
+        if let Some(instr) = entry.get_first_instruction() {
+            builder.position_before(&instr);
+        } else {
+            builder.position_at_end(entry);
+        }
+        builder.build_alloca(ty, name).unwrap()
+    }
+
+    pub(crate) fn declare_sysy_runtime(&self) {
+        let i32_type = self.context.i32_type();
+        let void_type = self.context.void_type();
+        let i32_ptr_type = self.context.ptr_type(inkwell::AddressSpace::default());
+
+        // int getint()
+        let fn_type = i32_type.fn_type(&[], false);
+        self.module.add_function("getint", fn_type, None);
+
+        // int getch()
+        self.module.add_function("getch", fn_type, None);
+
+        // int getarray(int a[])
+        let fn_type = i32_type.fn_type(&[i32_ptr_type.into()], false);
+        self.module.add_function("getarray", fn_type, None);
+
+        // void putint(int a)
+        let fn_type = void_type.fn_type(&[i32_type.into()], false);
+        self.module.add_function("putint", fn_type, None);
+
+        // void putch(int a)
+        self.module.add_function("putch", fn_type, None);
+
+        // void putarray(int n, int a[])
+        let fn_type = void_type.fn_type(&[i32_type.into(), i32_ptr_type.into()], false);
+        self.module.add_function("putarray", fn_type, None);
+
+        // void starttime()
+        let fn_type = void_type.fn_type(&[], false);
+        self.module.add_function("starttime", fn_type, None);
+
+        // void stoptime()
+        self.module.add_function("stoptime", fn_type, None);
+    }
+
     /// convert `nanoc_analyzer::r#Type::NType` to `BasicTypeEnum`
-    pub fn convert_ntype_to_type(&self, ntype: &NType) -> BasicTypeEnum<'ctx> {
+    pub(crate) fn convert_ntype_to_type(&self, ntype: &NType) -> BasicTypeEnum<'ctx> {
         match ntype {
             NType::Int => self.context.i32_type().into(),
             NType::Float => self.context.f32_type().into(),
@@ -59,7 +158,7 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
     }
 
     /// convert `array_tree` to `BasicValueEnum`, 用于全局变量初始化
-    pub fn convert_array_tree_to_const_value(
+    pub(crate) fn convert_array_tree_to_const_value(
         &self,
         tree: &ArrayTree,
         ty: BasicTypeEnum<'ctx>,
@@ -118,8 +217,42 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
         }
     }
 
+    /// 从 IndexVal 获取变量的 (type, ptr)
+    pub(crate) fn get_element_ptr_by_index_val(
+        &mut self,
+        index_val: &IndexVal,
+    ) -> (BasicTypeEnum<'ctx>, PointerValue<'ctx>, String) {
+        let name = name_text(&index_val.name().expect("变量缺名"));
+        let (ptr, elem_ty) = self.lookup_var(&name).expect("变量未定义");
+
+        if !elem_ty.is_array_type() {
+            return (elem_ty, ptr, name);
+        }
+
+        let zero = std::iter::once(self.context.i32_type().const_zero());
+        let indices = zero
+            .chain(
+                index_val
+                    .indices()
+                    .map(|e| self.compile_expr(e).into_int_value()),
+            )
+            .collect::<Vec<_>>();
+
+        let gep = unsafe {
+            self.builder
+                .build_gep(elem_ty, ptr, &indices, "idx.gep")
+                .expect("数组 GEP 失败")
+        };
+
+        let mut final_ty = elem_ty;
+        for _ in 0..indices.len() - 1 {
+            final_ty = final_ty.into_array_type().get_element_type();
+        }
+        (final_ty, gep, name)
+    }
+
     /// 从 analyzer 获取常量的值
-    pub fn get_const_var_value(&self, expr: &impl AstNode) -> BasicValueEnum<'ctx> {
+    pub(crate) fn get_const_var_value(&self, expr: &impl AstNode) -> BasicValueEnum<'ctx> {
         let value = self
             .analyzer
             .get_value(expr.syntax().text_range())
@@ -128,7 +261,7 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
     }
 
     /// 将任意值转为 i1 布尔
-    pub fn as_bool(&self, val: BasicValueEnum<'ctx>) -> IntValue<'ctx> {
+    pub(crate) fn as_bool(&self, val: BasicValueEnum<'ctx>) -> IntValue<'ctx> {
         match val {
             BasicValueEnum::IntValue(i) => {
                 if i.get_type().get_bit_width() == 1 {
@@ -158,7 +291,7 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
     }
 
     /// convert `Value` to `BasicValueEnum`
-    pub fn convert_value(&self, value: &Value) -> BasicValueEnum<'ctx> {
+    pub(crate) fn convert_value(&self, value: &Value) -> BasicValueEnum<'ctx> {
         match value {
             Value::Int(x) => self.context.i32_type().const_int(*x as u64, false).into(),
             Value::Float(x) => self.context.f32_type().const_float(*x as f64).into(),
@@ -169,7 +302,7 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
     }
 
     /// 将 i1 无符号扩展为 i32
-    pub fn bool_to_i32(&self, val: IntValue<'ctx>) -> IntValue<'ctx> {
+    pub(crate) fn bool_to_i32(&self, val: IntValue<'ctx>) -> IntValue<'ctx> {
         self.builder
             .build_int_z_extend(val, self.context.i32_type(), "bool_ext")
             .unwrap()

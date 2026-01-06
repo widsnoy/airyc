@@ -10,6 +10,7 @@ source_filename = "main"
 @c = global i32 8
 @d = constant [2 x float] [float 0x3FF1C28F60000000, float 0.000000e+00]
 @e = global float 0x3FF1C28F60000000
+@g = global [2 x i32] [i32 1, i32 2]
 
 declare i32 @getint()
 
@@ -26,3 +27,18 @@ declare void @putarray(i32, ptr)
 declare void @starttime()
 
 declare void @stoptime()
+
+define i32 @main() {
+entry:
+  %b = alloca [2 x i32], align 4
+  %a = alloca [3 x i32], align 4
+  store [3 x i32] [i32 1, i32 2, i32 3], ptr %a, align 4
+  store [2 x i32] zeroinitializer, ptr %b, align 4
+  %idx.gep = getelementptr ptr, ptr %b, i32 0
+  store i32 1, ptr %idx.gep, align 4
+  %idx.gep1 = getelementptr ptr, ptr %a, i32 1
+  %idx.load = load [3 x i32], ptr %idx.gep1, align 4
+  %idx.gep2 = getelementptr ptr, ptr %b, i32 1
+  store [3 x i32] %idx.load, ptr %idx.gep2, align 4
+  ret i32 0
+}
