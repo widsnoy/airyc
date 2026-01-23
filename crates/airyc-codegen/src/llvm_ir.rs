@@ -90,9 +90,10 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
         let var_ty: &'a NType = &var.ty;
         let basic_ty = self.convert_ntype_to_type(var_ty)?;
         let init_node = def.init().ok_or(CodegenError::Missing("initial value"))?;
-        let value = self.compile_const_init_val(init_node, basic_ty)?;
 
         if self.symbols.current_function.is_none() {
+            // 全局 const 变量需要编译时常量初始化
+            let value = self.compile_const_init_val(init_node, basic_ty)?;
             let global = self.module.add_global(basic_ty, None, name);
             global.set_initializer(&value);
             global.set_constant(true);
@@ -101,14 +102,54 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
                 Symbol::new(global.as_pointer_value(), &var.ty),
             );
         } else {
+            // 局部 const 变量允许运行时初始化
             let func = self
                 .symbols
                 .current_function
                 .ok_or(CodegenError::Missing("current function"))?;
             let alloca = self.create_entry_alloca(func, basic_ty, name)?;
-            self.builder
-                .build_store(alloca, value)
-                .map_err(|_| CodegenError::LlvmBuild("store failed"))?;
+
+            // 尝试获取编译时常量值，如果失败则编译表达式
+            let (init_val, array_tree) = if let Some(const_expr) = init_node.expr() {
+                if let Ok(const_val) = self.get_const_var_value(&const_expr) {
+                    (Some(const_val), None)
+                } else {
+                    // 运行时初始化 - 从 ConstExpr 获取内部的 Expr
+                    let expr = const_expr
+                        .expr()
+                        .ok_or(CodegenError::Missing("expression"))?;
+                    (Some(self.compile_expr(expr)?), None)
+                }
+            } else {
+                // 数组初始化
+                let range = init_node.syntax().text_range();
+                let array_tree = self
+                    .analyzer
+                    .expand_array
+                    .get(&range)
+                    .ok_or(CodegenError::Missing("array init info"))?;
+                if self.analyzer.is_compile_time_constant(range) {
+                    (
+                        Some(self.convert_array_tree_to_global_init(array_tree, basic_ty)?),
+                        None,
+                    )
+                } else {
+                    (None, Some(array_tree))
+                }
+            };
+
+            if let Some(init_val) = init_val {
+                self.builder
+                    .build_store(alloca, init_val)
+                    .map_err(|_| CodegenError::LlvmBuild("store failed"))?;
+            } else {
+                let array_tree = array_tree.ok_or(CodegenError::Missing("array tree"))?;
+                self.builder
+                    .build_store(alloca, basic_ty.const_zero())
+                    .map_err(|_| CodegenError::LlvmBuild("store failed"))?;
+                let mut indices = vec![self.context.i32_type().const_zero()];
+                self.walk_on_const_array_tree(array_tree, &mut indices, alloca, basic_ty)?;
+            }
             self.symbols.insert_var(name.to_string(), alloca, var_ty);
         }
         Ok(())
@@ -128,7 +169,7 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
             .expand_array
             .get(&range)
             .ok_or(CodegenError::Missing("array init info"))?;
-        self.convert_array_tree_to_const_value(array_tree, ty)
+        self.convert_array_tree_to_global_init(array_tree, ty)
     }
 
     fn compile_var_decl(&mut self, decl: VarDecl) -> Result<()> {
@@ -173,9 +214,9 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
                         .expand_array
                         .get(&range)
                         .ok_or(CodegenError::Missing("array init info"))?;
-                    if self.analyzer.is_constant(range) {
+                    if self.analyzer.is_compile_time_constant(range) {
                         (
-                            Some(self.convert_array_tree_to_const_value(array_tree, basic_ty)?),
+                            Some(self.convert_array_tree_to_global_init(array_tree, basic_ty)?),
                             None,
                         )
                     } else {
@@ -208,7 +249,7 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
         Ok(())
     }
 
-    /// Walk ArrayTree leaves and store initial values
+    /// Walk ArrayTree leaves and store initial values (for VarDef with Expr)
     fn walk_on_array_tree(
         &mut self,
         array_tree: &ArrayTree,
@@ -237,6 +278,54 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
         Ok(())
     }
 
+    /// Walk ArrayTree leaves and store initial values (for ConstDef with ConstExpr)
+    fn walk_on_const_array_tree(
+        &mut self,
+        array_tree: &ArrayTree,
+        indices: &mut Vec<IntValue<'ctx>>,
+        ptr: PointerValue<'ctx>,
+        elem_ty: BasicTypeEnum<'ctx>,
+    ) -> Result<()> {
+        match array_tree {
+            ArrayTree::Val(ArrayTreeValue::ConstExpr(const_expr)) => {
+                // 尝试获取编译时常量值，否则编译内部表达式
+                let value = if let Ok(const_val) = self.get_const_var_value(const_expr) {
+                    const_val
+                } else {
+                    let expr = const_expr
+                        .expr()
+                        .ok_or(CodegenError::Missing("expression"))?;
+                    self.compile_expr(expr)?
+                };
+                let gep = unsafe {
+                    self.builder
+                        .build_gep(elem_ty, ptr, indices, "idx.gep")
+                        .map_err(|_| CodegenError::LlvmBuild("gep failed"))?
+                };
+                self.builder
+                    .build_store(gep, value)
+                    .map_err(|_| CodegenError::LlvmBuild("store failed"))?;
+            }
+            ArrayTree::Children(children) => {
+                let i32_type = self.context.i32_type();
+                for (i, child) in children.iter().enumerate() {
+                    indices.push(i32_type.const_int(i as u64, false));
+                    self.walk_on_const_array_tree(child, indices, ptr, elem_ty)?;
+                    indices.pop();
+                }
+            }
+            ArrayTree::Val(ArrayTreeValue::Empty) => {
+                // Empty 值已经被 zeroinitializer 处理，不需要额外操作
+            }
+            _ => {
+                return Err(CodegenError::Unsupported(
+                    "unexpected array tree value in const init".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
     /// Global variable initialization (default 0)
     fn const_init_or_zero(
         &mut self,
@@ -251,7 +340,7 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
             return self.convert_value(value);
         }
         if let Some(array_tree) = self.analyzer.expand_array.get(&range) {
-            return self.convert_array_tree_to_const_value(array_tree, ty);
+            return self.convert_array_tree_to_global_init(array_tree, ty);
         }
         Err(CodegenError::Missing("init value"))
     }
@@ -265,7 +354,7 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
             .func_type()
             .map(|t| self.compile_func_type(t))
             .transpose()?
-            .unwrap_or((&NType::Int, false));
+            .unwrap_or((NType::Int, false));
 
         let params: Vec<(String, &'a NType)> = func
             .params()
@@ -288,11 +377,11 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
             .map(|(_, p)| self.convert_ntype_to_type(p).map(|t| t.into()))
             .collect::<Result<Vec<_>>>()?;
 
-        let ret_ty = self.convert_ntype_to_type(ret_ty)?;
+        let ret_llvm_ty = self.convert_ntype_to_type(&ret_ty)?;
         let fn_type = if is_void {
             self.context.void_type().fn_type(&basic_params, false)
         } else {
-            ret_ty.fn_type(&basic_params, false)
+            ret_llvm_ty.fn_type(&basic_params, false)
         };
 
         let function = self.module.add_function(&name, fn_type, None);
@@ -332,7 +421,7 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
             if is_void {
                 self.builder.build_return(None).ok();
             } else {
-                let zero = ret_ty.const_zero();
+                let zero = ret_llvm_ty.const_zero();
                 self.builder.build_return(Some(&zero)).ok();
             }
         }
@@ -342,16 +431,17 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
         Ok(())
     }
 
-    fn compile_func_type(&mut self, ty: FuncType) -> Result<(&'a NType, bool)> {
-        if ty.void_token().is_some() {
-            return Ok((&NType::Void, true));
+    fn compile_func_type(&mut self, ty: FuncType) -> Result<(NType, bool)> {
+        // 从 analyzer 的 type_table 获取已计算的返回类型
+        let range = ty.syntax().text_range();
+        if let Some(ret_type) = self.analyzer.get_expr_type(range) {
+            let is_void = matches!(ret_type, NType::Void);
+            return Ok((ret_type.clone(), is_void));
         }
-        let base = ty
-            .ty()
-            .map(|t| self.compile_type(t))
-            .transpose()?
-            .ok_or(CodegenError::Missing("return type"))?;
-        Ok((base, false))
+
+        Err(CodegenError::Missing(
+            "calculate func return type in analyzer",
+        ))
     }
 
     fn compile_func_f_param(&mut self, param: FuncFParam) -> Result<&'a NType> {
@@ -537,7 +627,7 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
 
     fn compile_return_stmt(&mut self, stmt: ReturnStmt) -> Result<()> {
         if let Some(expr) = stmt.expr() {
-            let val = self.compile_expr(expr)?.into_int_value();
+            let val = self.compile_expr(expr)?;
             self.builder.build_return(Some(&val)).ok();
         } else {
             self.builder.build_return(None).ok();
@@ -969,18 +1059,5 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
             return Ok(self.context.f32_type().const_float(v as f64).into());
         }
         Err(CodegenError::Unsupported("unknown literal".into()))
-    }
-
-    fn compile_type(&mut self, ty: Type) -> Result<&'a NType> {
-        if ty.int_token().is_some() {
-            return Ok(&NType::Int);
-        }
-        if ty.float_token().is_some() {
-            return Ok(&NType::Float);
-        }
-        if ty.struct_token().is_some() {
-            return Err(CodegenError::NotImplemented("struct type"));
-        }
-        Err(CodegenError::Unsupported("unknown type".into()))
     }
 }

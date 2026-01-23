@@ -124,8 +124,9 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
         }
     }
 
-    /// Convert `ArrayTree` to `BasicValueEnum` for global variable initialization
-    pub(crate) fn convert_array_tree_to_const_value(
+    /// Convert `ArrayTree` to LLVM constant value for global variable initialization.
+    /// This function only handles compile-time constants.
+    pub(crate) fn convert_array_tree_to_global_init(
         &self,
         tree: &ArrayTree,
         ty: BasicTypeEnum<'ctx>,
@@ -136,7 +137,7 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
                 let mut value_vec = Vec::with_capacity(len);
                 let child_ty = ty.into_array_type().get_element_type();
                 for child in array_trees {
-                    value_vec.push(self.convert_array_tree_to_const_value(child, child_ty)?);
+                    value_vec.push(self.convert_array_tree_to_global_init(child, child_ty)?);
                 }
                 let count = len.saturating_sub(array_trees.len());
                 value_vec.extend(std::iter::repeat_with(|| child_ty.const_zero()).take(count));
