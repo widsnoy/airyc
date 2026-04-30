@@ -6,7 +6,7 @@ use clap::{Parser, ValueEnum};
 #[derive(Parser, Debug)]
 #[command(
     name = "airyc-cli",
-    version = "0.2.1",
+    version = "0.3.0",
     about = "https://github.com/widsnoy/airyc/"
 )]
 pub struct Args {
