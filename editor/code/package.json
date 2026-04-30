@@ -4,6 +4,10 @@
     "description": "language support for airyc programming language",
     "version": "0.1.0",
     "publisher": "widsnoy",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/widsnoy/airyc.git"
+    },
     "engines": {
         "vscode": "^1.75.0"
     },
@@ -11,6 +15,10 @@
         "Programming Languages"
     ],
     "main": "./out/extension.js",
+    "activationEvents": [
+        "onLanguage:airyc",
+        "onCommand:airyc.restartServer"
+    ],
     "contributes": {
         "languages": [
             {
