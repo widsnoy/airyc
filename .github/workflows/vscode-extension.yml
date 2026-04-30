@@ -30,7 +30,7 @@ jobs:
 
       - name: Install Alpine packages
         run: |
-          apk add --no-cache nodejs npm 
+          apk add --no-cache bash nodejs npm
           node --version
           npm --version
 
