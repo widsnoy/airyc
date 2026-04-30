@@ -31,6 +31,7 @@ target
 /target
 
 /playground
+/thesis
 
 # VSCode Extension
 editor/code/node_modules/
@@ -40,3 +41,4 @@ editor/code/*.log
 editor/code/.vscode-test/
 editor/code/server
 
+.codex

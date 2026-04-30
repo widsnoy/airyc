@@ -1,5 +1,6 @@
 .vscode-test/**
 .vscode/**
+.codex
 .gitignore
 .yarnrc
 vsc-extension-quickstart.md
@@ -9,3 +10,4 @@ vsc-extension-quickstart.md
 **/*.ts
 src/**
 node_modules/**
+server/**/debug/**
