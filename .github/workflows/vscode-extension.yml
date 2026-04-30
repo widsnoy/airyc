@@ -28,20 +28,11 @@ jobs:
           fi
           echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: editor/code/package-lock.json
-
-      - name: Install Windows GNU toolchain
+      - name: Install Alpine packages
         run: |
-          if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
-            echo "Windows GNU toolchain already installed"
-          else
-            apk add --no-cache mingw-w64-binutils mingw-w64-gcc
-          fi
+          apk add --no-cache nodejs npm mingw-w64-binutils mingw-w64-gcc
+          node --version
+          npm --version
           x86_64-w64-mingw32-gcc --version
           x86_64-w64-mingw32-dlltool --version
 
