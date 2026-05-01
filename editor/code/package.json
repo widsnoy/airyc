@@ -15,10 +15,7 @@
         "Programming Languages"
     ],
     "main": "./out/extension.js",
-    "activationEvents": [
-        "onLanguage:airyc",
-        "onCommand:airyc.restartServer"
-    ],
+    "activationEvents": [],
     "contributes": {
         "languages": [
             {
@@ -64,8 +61,9 @@
         ]
     },
     "scripts": {
-        "vscode:prepublish": "npm run build:all:release && npm run compile",
+        "vscode:prepublish": "npm run build:all:release && npm run bundle",
         "compile": "tsc -p ./",
+        "bundle": "esbuild src/extension.ts --bundle --platform=node --format=cjs --target=node24 --external:vscode --outfile=out/extension.js",
         "pretest": "npm run compile",
         "lint": "eslint src --ext ts",
         "build:linux:debug": "./build-server.sh linux debug",
@@ -78,7 +76,7 @@
         "dev:linux:release": "npm run build:linux:release && npm run compile",
         "dev:windows:debug": "npm run build:windows:debug && npm run compile",
         "dev:windows:release": "npm run build:windows:release && npm run compile",
-        "package:vsix": "npm run build:all:release && npm run compile && vsce package"
+        "package:vsix": "vsce package --no-dependencies"
     },
     "dependencies": {
         "vscode-languageclient": "^9.0.1"
@@ -88,6 +86,7 @@
         "@types/vscode": "^1.75.0",
         "@typescript-eslint/eslint-plugin": "^6.0.0",
         "@typescript-eslint/parser": "^6.0.0",
+        "esbuild": "^0.25.0",
         "eslint": "^8.0.0",
         "typescript": "^5.0.0",
         "@vscode/vsce": "^2.0.0"

@@ -4,6 +4,9 @@
 .gitignore
 .yarnrc
 vsc-extension-quickstart.md
+*.vsix
+build-server.sh
+package-lock.json
 **/tsconfig.json
 **/.eslintrc.json
 **/*.map
