@@ -20,8 +20,8 @@ struct FAT {
 
 struct FCB {
     filename: [u8; 100],
-    not_empty: i8,
-    attrbute: i8,
+    not_empty: u8,
+    attrbute: u8,
     time: i32,
     date: i32,
     first_block: i32,
@@ -32,27 +32,27 @@ struct FCB {
 struct USEROPEN {
     fcb: *mut struct FCB,
     dir: [u8; 100],
-    topenfile: i8,
-    buf: *mut i8,
+    topenfile: u8,
+    buf: *mut u8,
     buf_ptr: i32,
     data_ptr: i32
 }
 
 struct BLOCK0 {
     information: [u8; 10],
-    block0: *mut i8,
-    block0_ed: *mut i8,
-    fat0: *mut i8,
-    fat0_ed: *mut i8,
-    fat1: *mut i8,
-    fat1_ed: *mut i8,
-    root: *mut i8,
-    root_ed: *mut i8,
-    data: *mut i8
+    block0: *mut u8,
+    block0_ed: *mut u8,
+    fat0: *mut u8,
+    fat0_ed: *mut u8,
+    fat1: *mut u8,
+    fat1_ed: *mut u8,
+    root: *mut u8,
+    root_ed: *mut u8,
+    data: *mut u8
 }
 
 struct BLOCK {
-    data: [i8; 1024]
+    data: [u8; 1024]
 }
 
 // 全局变量
@@ -62,7 +62,7 @@ let current_dir: [u8; 100];
 let fcb_stk: [*mut struct FCB; 30];
 let fcb_top: i32;
 let boot: *mut struct BLOCK0;
-let mem: [i8; 1024000];
+let mem: [u8; 1024000];
 
 // get_fcb 函数使用的静态变量
 let get_fcb_stk: [*mut struct FCB; 30];
@@ -76,37 +76,37 @@ let SIZEOF_PTR: const i32 = 8;
 let SIZEOF_I32: const i32 = 4;
 
 // 类型转换辅助函数
-fn cast_to_fcb(ptr: *mut i8) -> *mut struct FCB {
+fn cast_to_fcb(ptr: *mut u8) -> *mut struct FCB {
     let void_ptr: *mut void = ptr;
     return void_ptr;
 }
 
-fn cast_to_fat(ptr: *mut i8) -> *mut struct FAT {
+fn cast_to_fat(ptr: *mut u8) -> *mut struct FAT {
     let void_ptr: *mut void = ptr;
     return void_ptr;
 }
 
-fn cast_to_i32_ptr(ptr: *mut i8) -> *mut i32 {
+fn cast_to_i32_ptr(ptr: *mut u8) -> *mut i32 {
     let void_ptr: *mut void = ptr;
     return void_ptr;
 }
 
-fn cast_to_fcb_ptr_ptr(ptr: *mut i8) -> *mut *mut struct FCB {
+fn cast_to_fcb_ptr_ptr(ptr: *mut u8) -> *mut *mut struct FCB {
     let void_ptr: *mut void = ptr;
     return void_ptr;
 }
 
-fn cast_to_i8(ptr: *mut void) -> *mut i8 {
+fn cast_to_u8(ptr: *mut void) -> *mut u8 {
     return ptr;
 }
 
-fn cast_to_block0(ptr: *mut i8) -> *mut struct BLOCK0 {
+fn cast_to_block0(ptr: *mut u8) -> *mut struct BLOCK0 {
     let void_ptr: *mut void = ptr;
     return void_ptr;
 }
 
 // 初始化 BLOCK0
-fn block0_Init(p: *mut struct BLOCK0, info: *const u8, vhead: *mut i8) {
+fn block0_Init(p: *mut struct BLOCK0, info: *const u8, vhead: *mut u8) {
     if (info != null) {
         memmove(p->information, info, strlen(info) + 1);
     }
@@ -122,7 +122,7 @@ fn block0_Init(p: *mut struct BLOCK0, info: *const u8, vhead: *mut i8) {
 }
 
 // 创建 FCB
-fn fcb_set(name: *const u8, free: i8, attrbute: i8, time: i32, date: i32, first_block: i32, length: i32) -> *mut struct FCB {
+fn fcb_set(name: *const u8, free: u8, attrbute: u8, time: i32, date: i32, first_block: i32, length: i32) -> *mut struct FCB {
     let p: *mut struct FCB = cast_to_fcb(null);
     
     let it: *mut struct FCB = cast_to_fcb(boot->root);
@@ -159,13 +159,13 @@ fn travel_dir(dir: *mut struct FCB, name: *const u8) -> *mut struct FCB {
     }
     
     while (fat_p != END) {
-        let block_ptr: *mut i8 = boot->data + fat_p * 1024;
+        let block_ptr: *mut u8 = boot->data + fat_p * 1024;
         let it: *mut i32 = cast_to_i32_ptr(block_ptr);
         let end: *mut i32 = cast_to_i32_ptr(block_ptr + 1024);
         
         while (it < end) {
             if (*it > 0) {
-                let fcb_ptr: *mut i8 = &mem[0] + *it;
+                let fcb_ptr: *mut u8 = &mem[0] + *it;
                 let fcb: *mut struct FCB = cast_to_fcb(fcb_ptr);
                 if (strcmp(fcb->filename, name) == 0) {
                     return fcb;
@@ -174,7 +174,7 @@ fn travel_dir(dir: *mut struct FCB, name: *const u8) -> *mut struct FCB {
             it = it + 1;
         }
         
-        let fat_ptr: *mut i8 = boot->fat0 + fat_p * 4;
+        let fat_ptr: *mut u8 = boot->fat0 + fat_p * 4;
         let fat_entry: *mut struct FAT = cast_to_fat(fat_ptr);
         fat_p = fat_entry->next;
     }
@@ -246,7 +246,7 @@ fn is_empty_dir(path: *const u8) -> i32 {
     }
     
     while (fat_p != END) {
-        let block_ptr: *mut i8 = boot->data + fat_p * 1024;
+        let block_ptr: *mut u8 = boot->data + fat_p * 1024;
         let it: *mut *mut struct FCB = cast_to_fcb_ptr_ptr(block_ptr);
         let end: *mut *mut struct FCB = cast_to_fcb_ptr_ptr(block_ptr + 1024);
         
@@ -257,7 +257,7 @@ fn is_empty_dir(path: *const u8) -> i32 {
             it = it + 1;
         }
         
-        let fat_ptr: *mut i8 = boot->fat0 + fat_p * 4;
+        let fat_ptr: *mut u8 = boot->fat0 + fat_p * 4;
         let fat_entry: *mut struct FAT = cast_to_fat(fat_ptr);
         fat_p = fat_entry->next;
     }
@@ -301,7 +301,7 @@ fn my_open(path: *const u8, chdir: i32) -> i32 {
             let fat_p: i32 = file_fcb->first_block;
             while (fat_p != -1 && fat_p != END) {
                 op->data_ptr = fat_p;
-                let fat_ptr: *mut i8 = boot->fat0 + fat_p * 4;
+                let fat_ptr: *mut u8 = boot->fat0 + fat_p * 4;
                 let fat_entry: *mut struct FAT = cast_to_fat(fat_ptr);
                 fat_p = fat_entry->next;
             }
@@ -312,7 +312,7 @@ fn my_open(path: *const u8, chdir: i32) -> i32 {
                 op->buf = boot->data + op->data_ptr * 1024;
             }
             
-            op->topenfile = 1i8;
+            op->topenfile = 1u8;
             return i;
         }
         i = i + 1;
@@ -329,7 +329,7 @@ fn add_empty_block(fd: i32, lst: i32) -> i32 {
     let fat0_ed: *mut struct FAT = cast_to_fat(boot->fat0_ed);
     while (it < fat0_ed) {
         if (it->next == FREE) {
-            id = it - boot->fat0;
+            id = it - cast_to_fat(boot->fat0);
             break;
         }
         it = it + 1;
@@ -341,17 +341,17 @@ fn add_empty_block(fd: i32, lst: i32) -> i32 {
     }
     
     if (lst >= 0) {
-        let fat0_ptr: *mut i8 = boot->fat0 + lst * 4;
+        let fat0_ptr: *mut u8 = boot->fat0 + lst * 4;
         let fat0_entry: *mut struct FAT = cast_to_fat(fat0_ptr);
-        let fat1_ptr: *mut i8 = boot->fat1 + lst * 4;
+        let fat1_ptr: *mut u8 = boot->fat1 + lst * 4;
         let fat1_entry: *mut struct FAT = cast_to_fat(fat1_ptr);
         fat0_entry->next = id;
         fat1_entry->next = id;
     }
     
-    let fat0_ptr: *mut i8 = boot->fat0 + id * 4;
+    let fat0_ptr: *mut u8 = boot->fat0 + id * 4;
     let fat0_entry: *mut struct FAT = cast_to_fat(fat0_ptr);
-    let fat1_ptr: *mut i8 = boot->fat1 + id * 4;
+    let fat1_ptr: *mut u8 = boot->fat1 + id * 4;
     let fat1_entry: *mut struct FAT = cast_to_fat(fat1_ptr);
     fat0_entry->next = END;
     fat1_entry->next = END;
@@ -369,10 +369,10 @@ fn add_empty_block(fd: i32, lst: i32) -> i32 {
 }
 
 // 写缓冲区
-fn writebuf(fd: i32, src: *mut i8, len: i32) -> i32 {
+fn writebuf(fd: i32, src: *mut u8, len: i32) -> i32 {
     let op: *mut struct USEROPEN = &open_file_list[fd];
     let remaining: i32 = len;
-    let src_ptr: *mut i8 = src;
+    let src_ptr: *mut u8 = src;
     
     while (remaining > 0) {
         if ((op->buf_ptr == BLOCK_SIZE || op->data_ptr < 0) && add_empty_block(fd, op->data_ptr) < 0) {
@@ -404,7 +404,7 @@ fn my_close(fd: i32) -> i32 {
     let op: *mut struct USEROPEN = &open_file_list[fd];
     if (op->topenfile == 1) {
         op->fcb->last_block_len = op->buf_ptr;
-        op->topenfile = 0i8;
+        op->topenfile = 0u8;
     }
     
     return 1;
@@ -446,7 +446,7 @@ fn startsys() {
             it = it + 1;
         }
         
-        let root_fcb: *mut struct FCB = fcb_set("/", 1i8, 1i8, 0, 0, -1, 0);
+        let root_fcb: *mut struct FCB = fcb_set("/", 1u8, 1u8, 0, 0, -1, 0);
         if (root_fcb != boot->root) {
             printf("Error\n");
         }
@@ -459,7 +459,7 @@ fn startsys() {
     
     let i: i32 = 0;
     while (i < MAXOPENFILE) {
-        open_file_list[i].topenfile = 0i8;
+        open_file_list[i].topenfile = 0u8;
         i = i + 1;
     }
     
@@ -497,10 +497,10 @@ fn my_mkdir(dirname: *const u8) {
     let op: *mut struct USEROPEN = &open_file_list[curdir];
     
     if (travel_dir(fcb_stk[fcb_top], dirname) == null && strcmp(dirname, ".") != 0 && strcmp(dirname, "..") != 0) {
-        let new_fcb: *mut struct FCB = fcb_set(dirname, 1i8, 1i8, 0, 0, -1, 0);
-        let offset: i32 = cast_to_i8(new_fcb) - &mem[0];
+        let new_fcb: *mut struct FCB = fcb_set(dirname, 1u8, 1u8, 0, 0, -1, 0);
+        let offset: i32 = cast_to_u8(new_fcb) - &mem[0];
         let offset_void: *mut void = &offset;
-        writebuf(curdir, cast_to_i8(offset_void), 4);
+        writebuf(curdir, cast_to_u8(offset_void), 4);
     } else {
         printf("[mkdir]: create dir failed");
     }
@@ -511,10 +511,10 @@ fn my_touch(filename: *const u8) {
     let op: *mut struct USEROPEN = &open_file_list[curdir];
     
     if (travel_dir(fcb_stk[fcb_top], filename) == null) {
-        let new_fcb: *mut struct FCB = fcb_set(filename, 1i8, 0i8, 0, 0, -1, 0);
-        let offset: i32 = cast_to_i8(new_fcb) - &mem[0];
+        let new_fcb: *mut struct FCB = fcb_set(filename, 1u8, 0u8, 0, 0, -1, 0);
+        let offset: i32 = cast_to_u8(new_fcb) - &mem[0];
         let offset_void: *mut void = &offset;
-        writebuf(curdir, cast_to_i8(offset_void), 4);
+        writebuf(curdir, cast_to_u8(offset_void), 4);
     } else {
         printf("[touch]: create file failed");
     }
@@ -528,13 +528,13 @@ fn my_ls() {
     }
     
     while (fat_p != END) {
-        let block_ptr: *mut i8 = boot->data + fat_p * 1024;
+        let block_ptr: *mut u8 = boot->data + fat_p * 1024;
         let it: *mut i32 = cast_to_i32_ptr(block_ptr);
         let end: *mut i32 = cast_to_i32_ptr(block_ptr + 1024);
         
         while (it < end) {
             if (*it > 0) {
-                let fcb_ptr: *mut i8 = &mem[0] + *it;
+                let fcb_ptr: *mut u8 = &mem[0] + *it;
                 let fcb: *mut struct FCB = cast_to_fcb(fcb_ptr);
                 if (fcb->not_empty != 0) {
                     let type_str: *mut u8 = "FILE";
@@ -553,7 +553,7 @@ fn my_ls() {
             it = it + 1;
         }
         
-        let fat_ptr: *mut i8 = boot->fat0 + fat_p * 4;
+        let fat_ptr: *mut u8 = boot->fat0 + fat_p * 4;
         let fat_entry: *mut struct FAT = cast_to_fat(fat_ptr);
         fat_p = fat_entry->next;
     }
@@ -567,13 +567,13 @@ fn my_tree(fcb: *mut struct FCB, pre_block: i32) {
     }
     
     while (fat_p != END) {
-        let block_ptr: *mut i8 = boot->data + fat_p * 1024;
+        let block_ptr: *mut u8 = boot->data + fat_p * 1024;
         let it: *mut i32 = cast_to_i32_ptr(block_ptr);
         let end: *mut i32 = cast_to_i32_ptr(block_ptr + 1024);
         
         while (it < end) {
             if (*it > 0) {
-                let child_ptr: *mut i8 = &mem[0] + *it;
+                let child_ptr: *mut u8 = &mem[0] + *it;
                 let child_fcb: *mut struct FCB = cast_to_fcb(child_ptr);
                 
                 if (child_fcb->not_empty != 0) {
@@ -592,7 +592,7 @@ fn my_tree(fcb: *mut struct FCB, pre_block: i32) {
             it = it + 1;
         }
         
-        let fat_ptr: *mut i8 = boot->fat0 + fat_p * 4;
+        let fat_ptr: *mut u8 = boot->fat0 + fat_p * 4;
         let fat_entry: *mut struct FAT = cast_to_fat(fat_ptr);
         fat_p = fat_entry->next;
     }
@@ -615,16 +615,16 @@ fn clean_data(fat_p: i32) {
     if (fat_p != -1) {
         let current: i32 = fat_p;
         while (current != END) {
-            let fat_ptr: *mut i8 = boot->fat0 + current * 4;
+            let fat_ptr: *mut u8 = boot->fat0 + current * 4;
             let fat_entry: *mut struct FAT = cast_to_fat(fat_ptr);
             let tmp: i32 = fat_entry->next;
             
-            let block_ptr: *mut i8 = boot->data + current * 1024;
-            let it: *mut i8 = block_ptr;
-            let end: *mut i8 = block_ptr + 1024;
+            let block_ptr: *mut u8 = boot->data + current * 1024;
+            let it: *mut u8 = block_ptr;
+            let end: *mut u8 = block_ptr + 1024;
         
         while (it < end) {
-                *it = 0i8;
+                *it = 0u8;
                 it = it + 1;
             }
             
@@ -655,8 +655,8 @@ fn my_write(filename: *const u8, type: i32) {
         my_close(in_open_list(file_fcb));
     }
     
-    let buf: [i8; 2048];
-    let ch: i8;
+    let buf: [u8; 2048];
+    let ch: u8;
     let index: i32 = 0;
     
     getchar();
@@ -666,7 +666,7 @@ fn my_write(filename: *const u8, type: i32) {
         index = index + 1;
         ch = getchar();
     }
-    buf[index] = 0i8;
+    buf[index] = 0u8;
     
     let fd: i32 = my_open(filename, 0);
     writebuf(fd, buf, index);
@@ -696,21 +696,21 @@ fn my_rm(filename: *const u8) {
     
     fat_p = fcb_stk[fcb_top]->first_block;
     while (fat_p != END) {
-        let block_ptr: *mut i8 = boot->data + fat_p * 1024;
+        let block_ptr: *mut u8 = boot->data + fat_p * 1024;
         let it: *mut i32 = cast_to_i32_ptr(block_ptr);
         let end: *mut i32 = cast_to_i32_ptr(block_ptr + 1024);
         
         while (it < end) {
-            let fcb_ptr: *mut i8 = &mem[0] + *it;
+            let fcb_ptr: *mut u8 = &mem[0] + *it;
             let fcb: *mut struct FCB = cast_to_fcb(fcb_ptr);
             if (*it > 0 && fcb == file_fcb) {
-                *it = 0i8;
+                *it = 0u8;
                 break;
             }
             it = it + 1;
         }
         
-        let fat_ptr: *mut i8 = boot->fat0 + fat_p * 4;
+        let fat_ptr: *mut u8 = boot->fat0 + fat_p * 4;
         let fat_entry: *mut struct FAT = cast_to_fat(fat_ptr);
         fat_p = fat_entry->next;
     }
@@ -734,9 +734,9 @@ fn my_read(filename: *const u8) {
     let cnt: i32 = 0;
     
     while (fat_p != END) {
-        let block_ptr: *mut i8 = boot->data + fat_p * 1024;
-        let it: *mut i8 = block_ptr;
-        let end: *mut i8 = block_ptr + 1024;
+        let block_ptr: *mut u8 = boot->data + fat_p * 1024;
+        let it: *mut u8 = block_ptr;
+        let end: *mut u8 = block_ptr + 1024;
         
         while (it < end) {
             if (it == null || *it == 0) {
@@ -751,7 +751,7 @@ fn my_read(filename: *const u8) {
             it = it + 1;
         }
         
-        let fat_ptr: *mut i8 = boot->fat0 + fat_p * 4;
+        let fat_ptr: *mut u8 = boot->fat0 + fat_p * 4;
         let fat_entry: *mut struct FAT = cast_to_fat(fat_ptr);
         fat_p = fat_entry->next;
     }

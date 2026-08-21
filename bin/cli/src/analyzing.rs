@@ -24,7 +24,7 @@ pub fn analyze_project(input_paths: &[PathBuf], vfs: &Vfs) -> Result<Project> {
     let mut errors_by_file = HashMap::new();
     for module in project.modules.values_mut() {
         if !module.semantic_errors.is_empty() {
-            let vec = module.semantic_errors.drain(..).collect();
+            let vec = std::mem::take(&mut module.semantic_errors);
             errors_by_file.insert(module.file_id, vec);
         }
     }

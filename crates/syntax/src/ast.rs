@@ -371,11 +371,7 @@ ast_node!(
 ast_node!(
     PrimitType ~ PRIMIT_TYPE {
         i32_token: token(I32_KW),
-        i8_token: token(I8_KW),
         u8_token: token(U8_KW),
-        u32_token: token(U32_KW),
-        i64_token: token(I64_KW),
-        u64_token: token(U64_KW),
         bool_token: token(BOOL_KW),
         void_token: token(VOID_KW),
         struct_token: token(STRUCT_KW),

@@ -79,11 +79,7 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
     pub(crate) fn convert_ntype_to_type(&self, ntype: &Ty) -> Result<BasicTypeEnum<'ctx>> {
         match ntype {
             Ty::I32 => Ok(self.context.i32_type().into()),
-            Ty::I8 => Ok(self.context.i8_type().into()),
             Ty::U8 => Ok(self.context.i8_type().into()),
-            Ty::U32 => Ok(self.context.i32_type().into()),
-            Ty::I64 => Ok(self.context.i64_type().into()),
-            Ty::U64 => Ok(self.context.i64_type().into()),
             Ty::Bool => Ok(self.context.bool_type().into()),
             Ty::Void => Ok(self.context.i8_type().into()),
             Ty::Array(ntype, count) => {
@@ -373,11 +369,7 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
     ) -> Result<BasicValueEnum<'ctx>> {
         match value {
             Value::I32(x) => Ok(self.context.i32_type().const_int(*x as u64, true).into()),
-            Value::I8(x) => Ok(self.context.i8_type().const_int(*x as u64, true).into()),
             Value::U8(x) => Ok(self.context.i8_type().const_int(*x as u64, false).into()),
-            Value::U32(x) => Ok(self.context.i32_type().const_int(*x as u64, false).into()),
-            Value::I64(x) => Ok(self.context.i64_type().const_int(*x as u64, true).into()),
-            Value::U64(x) => Ok(self.context.i64_type().const_int(*x, false).into()),
             Value::Bool(x) => Ok(self.context.bool_type().const_int(*x as u64, false).into()),
             Value::String(s) => {
                 // 字符串常量
@@ -510,12 +502,8 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
 
         // 获取目标 LLVM 类型
         let target_llvm_ty = match to {
-            Ty::I8 => self.context.i8_type(),
             Ty::U8 => self.context.i8_type(),
             Ty::I32 => self.context.i32_type(),
-            Ty::U32 => self.context.i32_type(),
-            Ty::I64 => self.context.i64_type(),
-            Ty::U64 => self.context.i64_type(),
             Ty::Bool => self.context.bool_type(),
             _ => return Ok(val),
         };
@@ -523,24 +511,22 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
         // 获取源和目标的位宽
         let from_bits = match from {
             Ty::Bool => 1,
-            Ty::I8 | Ty::U8 => 8,
-            Ty::I32 | Ty::U32 => 32,
-            Ty::I64 | Ty::U64 => 64,
+            Ty::U8 => 8,
+            Ty::I32 => 32,
             _ => return Ok(val),
         };
 
         let to_bits = match to {
             Ty::Bool => 1,
-            Ty::I8 | Ty::U8 => 8,
-            Ty::I32 | Ty::U32 => 32,
-            Ty::I64 | Ty::U64 => 64,
+            Ty::U8 => 8,
+            Ty::I32 => 32,
             _ => return Ok(val),
         };
 
         // 执行转换
         if from_bits < to_bits {
             // 扩展：有符号用 sext，无符号用 zext
-            let is_signed = matches!(from, Ty::I8 | Ty::I32 | Ty::I64);
+            let is_signed = matches!(from, Ty::I32);
             if is_signed {
                 self.builder
                     .build_int_s_extend(val, target_llvm_ty, "sext")
@@ -556,7 +542,7 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
                 .build_int_truncate(val, target_llvm_ty, "trunc")
                 .map_err(|_| CodegenError::LlvmBuild("trunc"))
         } else {
-            // 位宽相同，无需转换（如 i32 ↔ u32）
+            // 位宽相同，无需转换
             Ok(val)
         }
     }

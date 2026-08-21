@@ -305,7 +305,7 @@ fn test_function_call_with_implicit_conversion() {
 #[test]
 fn test_external_function_call() {
     let source = r#"
-    fn external_func(a: i32, b: *const i8) -> i32;
+    fn external_func(a: i32, b: *const u8) -> i32;
     
     fn main() -> i32 {
         let result: i32 = external_func(42, null);
@@ -322,7 +322,7 @@ fn test_external_function_call() {
 #[test]
 fn test_external_function_call_wrong_args() {
     let source = r#"
-    fn external_func(a: i32, b: *const i8) -> i32;
+    fn external_func(a: i32, b: *const u8) -> i32;
     
     fn main() -> i32 {
         let result: i32 = external_func(42);
@@ -831,7 +831,7 @@ fn test_const_void_variable_error() {
 #[test]
 fn test_variadic_function_call() {
     let source = r#"
-    fn printf(format: *const i8, ...) -> i32;
+    fn printf(format: *const u8, ...) -> i32;
     
     fn main() -> i32 {
         printf(null, 1, 2, 3);
@@ -848,7 +848,7 @@ fn test_variadic_function_call() {
 #[test]
 fn test_variadic_function_too_few_args() {
     let source = r#"
-    fn printf(format: *const i8, ...) -> i32;
+    fn printf(format: *const u8, ...) -> i32;
     
     fn main() -> i32 {
         printf();
@@ -923,7 +923,7 @@ fn test_variadic_function_type_check() {
     ));
 }
 
-// 新整数类型和字符字面量测试
+// 字节类型和字符字面量测试
 
 #[test]
 fn test_u8_basic() {
@@ -952,57 +952,9 @@ fn test_u8_overflow() {
 }
 
 #[test]
-fn test_u32_basic() {
+fn test_u8_to_i32_conversion() {
     let source = r#"
-        fn main() -> i32 {
-            let a: u32 = 0u32;
-            let b: u32 = 4294967295u32;
-            let c: u32 = 1000000u32;
-            return 0;
-        }
-    "#;
-    let module = analyze(source);
-    assert!(module.semantic_errors.is_empty());
-}
-
-#[test]
-fn test_i64_basic() {
-    let source = r#"
-        fn main() -> i32 {
-            let a: i64 = -9223372036854775808i64;
-            let b: i64 = 9223372036854775807i64;
-            let c: i64 = 0i64;
-            return 0;
-        }
-    "#;
-    let module = analyze(source);
-    assert!(module.semantic_errors.is_empty());
-}
-
-#[test]
-fn test_u64_basic() {
-    let source = r#"
-        fn main() -> i32 {
-            let a: u64 = 0u64;
-            let b: u64 = 18446744073709551615u64;
-            let c: u64 = 1000000000000u64;
-            return 0;
-        }
-    "#;
-    let module = analyze(source);
-    assert!(module.semantic_errors.is_empty());
-}
-
-#[test]
-fn test_type_conversion_signed() {
-    let source = r#"
-        fn test_i8_to_i32(x: i8) -> i32 {
-            return x;
-        }
-        fn test_i8_to_i64(x: i8) -> i64 {
-            return x;
-        }
-        fn test_i32_to_i64(x: i32) -> i64 {
+        fn test(x: u8) -> i32 {
             return x;
         }
         fn main() -> i32 {
@@ -1011,54 +963,6 @@ fn test_type_conversion_signed() {
     "#;
     let module = analyze(source);
     assert!(module.semantic_errors.is_empty());
-}
-
-#[test]
-fn test_type_conversion_unsigned() {
-    let source = r#"
-        fn test_u8_to_u32(x: u8) -> u32 {
-            return x;
-        }
-        fn test_u8_to_u64(x: u8) -> u64 {
-            return x;
-        }
-        fn test_u32_to_u64(x: u32) -> u64 {
-            return x;
-        }
-        fn main() -> i32 {
-            return 0;
-        }
-    "#;
-    let module = analyze(source);
-    assert!(module.semantic_errors.is_empty());
-}
-
-#[test]
-fn test_type_conversion_invalid_signed_to_unsigned() {
-    let source = r#"
-        fn test(x: i32) -> u32 {
-            return x;
-        }
-        fn main() -> i32 {
-            return 0;
-        }
-    "#;
-    let module = analyze(source);
-    assert!(!module.semantic_errors.is_empty());
-}
-
-#[test]
-fn test_type_conversion_invalid_unsigned_to_signed() {
-    let source = r#"
-        fn test(x: u32) -> i32 {
-            return x;
-        }
-        fn main() -> i32 {
-            return 0;
-        }
-    "#;
-    let module = analyze(source);
-    assert!(!module.semantic_errors.is_empty());
 }
 
 #[test]
@@ -1072,60 +976,6 @@ fn test_arithmetic_u8() {
             let e: u8 = a * b;
             let f: u8 = b / a;
             let g: u8 = b % a;
-            return 0;
-        }
-    "#;
-    let module = analyze(source);
-    assert!(module.semantic_errors.is_empty());
-}
-
-#[test]
-fn test_arithmetic_u32() {
-    let source = r#"
-        fn main() -> i32 {
-            let a: u32 = 1000u32;
-            let b: u32 = 2000u32;
-            let c: u32 = a + b;
-            let d: u32 = b - a;
-            let e: u32 = a * b;
-            let f: u32 = b / a;
-            let g: u32 = b % a;
-            return 0;
-        }
-    "#;
-    let module = analyze(source);
-    assert!(module.semantic_errors.is_empty());
-}
-
-#[test]
-fn test_arithmetic_i64() {
-    let source = r#"
-        fn main() -> i32 {
-            let a: i64 = 1000i64;
-            let b: i64 = 2000i64;
-            let c: i64 = a + b;
-            let d: i64 = b - a;
-            let e: i64 = a * b;
-            let f: i64 = b / a;
-            let g: i64 = b % a;
-            return 0;
-        }
-    "#;
-    let module = analyze(source);
-    assert!(module.semantic_errors.is_empty());
-}
-
-#[test]
-fn test_arithmetic_u64() {
-    let source = r#"
-        fn main() -> i32 {
-            let a: u64 = 1000u64;
-            let b: u64 = 2000u64;
-            let c: u64 = a + b;
-            let d: u64 = b - a;
-            let e: u64 = a * b;
-            let f: u64 = b / a;
-            let g: u64 = b % a;
             return 0;
         }
     "#;
@@ -1153,17 +1003,18 @@ fn test_comparison_u8() {
 }
 
 #[test]
-fn test_comparison_mixed_types_error() {
+fn test_mixed_u8_i32_promotion() {
     let source = r#"
         fn main() -> i32 {
             let a: i32 = 10;
-            let b: u32 = 20u32;
+            let b: u8 = 20u8;
             let c: bool = a < b;
+            let d: i32 = a + b;
             return 0;
         }
     "#;
     let module = analyze(source);
-    assert!(!module.semantic_errors.is_empty());
+    assert!(module.semantic_errors.is_empty());
 }
 
 #[test]
@@ -1182,15 +1033,12 @@ fn test_char_literal_basic() {
 }
 
 #[test]
-fn test_bool_to_signed_conversion() {
+fn test_bool_integer_conversion() {
     let source = r#"
-        fn test_bool_to_i8(x: bool) -> i8 {
+        fn test_bool_to_u8(x: bool) -> u8 {
             return x;
         }
         fn test_bool_to_i32(x: bool) -> i32 {
-            return x;
-        }
-        fn test_bool_to_i64(x: bool) -> i64 {
             return x;
         }
         fn main() -> i32 {
@@ -1199,20 +1047,6 @@ fn test_bool_to_signed_conversion() {
     "#;
     let module = analyze(source);
     assert!(module.semantic_errors.is_empty());
-}
-
-#[test]
-fn test_bool_to_unsigned_error() {
-    let source = r#"
-        fn test(x: bool) -> u32 {
-            return x;
-        }
-        fn main() -> i32 {
-            return 0;
-        }
-    "#;
-    let module = analyze(source);
-    assert!(!module.semantic_errors.is_empty());
 }
 
 #[test]
@@ -1228,24 +1062,11 @@ fn test_const_arithmetic_overflow_u8() {
 }
 
 #[test]
-fn test_const_arithmetic_overflow_i64() {
-    let source = r#"
-        fn main() -> i32 {
-            let a: const i64 = 9223372036854775807i64 + 1i64;
-            return 0;
-        }
-    "#;
-    let module = analyze(source);
-    assert!(!module.semantic_errors.is_empty());
-}
-
-#[test]
-fn test_array_with_new_types() {
+fn test_array_with_integer_types() {
     let source = r#"
         fn main() -> i32 {
             let arr1: [u8; 3] = {1u8, 2u8, 3u8};
-            let arr2: [u32; 2] = {100u32, 200u32};
-            let arr3: [i64; 2] = {100i64, 200i64};
+            let arr2: [i32; 2] = {100, 200};
             return 0;
         }
     "#;
@@ -1254,25 +1075,17 @@ fn test_array_with_new_types() {
 }
 
 #[test]
-fn test_function_params_new_types() {
+fn test_function_params_integer_types() {
     let source = r#"
         fn test_u8(a: u8, b: u8) -> u8 {
             return a + b;
         }
-        fn test_u32(a: u32, b: u32) -> u32 {
-            return a + b;
-        }
-        fn test_i64(a: i64, b: i64) -> i64 {
-            return a + b;
-        }
-        fn test_u64(a: u64, b: u64) -> u64 {
+        fn test_i32(a: i32, b: u8) -> i32 {
             return a + b;
         }
         fn main() -> i32 {
             let r1: u8 = test_u8(10u8, 20u8);
-            let r2: u32 = test_u32(100u32, 200u32);
-            let r3: i64 = test_i64(100i64, 200i64);
-            let r4: u64 = test_u64(100u64, 200u64);
+            let r2: i32 = test_i32(100, 20u8);
             return 0;
         }
     "#;

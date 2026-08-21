@@ -141,8 +141,8 @@ impl Module {
         // 检查未处理的溢出字面量（没有被一元负号包裹的）
         for (range, literal_text) in self.analyzing.overflowing_literals.drain() {
             // 从字面量文本中提取类型
-            let ty_str = if literal_text.ends_with("i8") {
-                "i8"
+            let ty_str = if literal_text.ends_with("u8") {
+                "u8"
             } else {
                 "i32"
             };

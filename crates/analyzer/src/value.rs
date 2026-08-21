@@ -9,11 +9,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     I32(i32),
-    I8(i8),
     U8(u8),
-    U32(u32),
-    I64(i64),
-    U64(u64),
     Bool(bool),
     String(String),
     Array(ArrayTree),
@@ -111,17 +107,8 @@ impl Value {
     pub fn cast_to_i32(&self) -> Result<Value, EvalError> {
         match self {
             Value::I32(v) => Ok(Value::I32(*v)),
-            Value::I8(v) => Ok(Value::I32(*v as i32)),
+            Value::U8(v) => Ok(Value::I32(*v as i32)),
             Value::Bool(v) => Ok(Value::I32(if *v { 1 } else { 0 })),
-            _ => Err(EvalError::TypeMismatch),
-        }
-    }
-
-    /// 将 Value 转换为 i8（用于常量折叠）
-    pub fn cast_to_i8(&self) -> Result<Value, EvalError> {
-        match self {
-            Value::I8(v) => Ok(Value::I8(*v)),
-            Value::Bool(v) => Ok(Value::I8(if *v { 1 } else { 0 })),
             _ => Err(EvalError::TypeMismatch),
         }
     }
@@ -131,11 +118,7 @@ impl Value {
         match self {
             Value::Bool(v) => Ok(Value::Bool(*v)),
             Value::I32(v) => Ok(Value::Bool(*v != 0)),
-            Value::I8(v) => Ok(Value::Bool(*v != 0)),
-            Value::I64(v) => Ok(Value::Bool(*v != 0)),
-            Value::U32(v) => Ok(Value::Bool(*v != 0)),
             Value::U8(v) => Ok(Value::Bool(*v != 0)),
-            Value::U64(v) => Ok(Value::Bool(*v != 0)),
             _ => Err(EvalError::TypeMismatch),
         }
     }
@@ -145,38 +128,6 @@ impl Value {
         match self {
             Value::U8(v) => Ok(Value::U8(*v)),
             Value::Bool(v) => Ok(Value::U8(if *v { 1 } else { 0 })),
-            _ => Err(EvalError::TypeMismatch),
-        }
-    }
-
-    /// 将 Value 转换为 u32
-    pub fn cast_to_u32(&self) -> Result<Value, EvalError> {
-        match self {
-            Value::U32(v) => Ok(Value::U32(*v)),
-            Value::U8(v) => Ok(Value::U32(*v as u32)),
-            Value::Bool(v) => Ok(Value::U32(if *v { 1 } else { 0 })),
-            _ => Err(EvalError::TypeMismatch),
-        }
-    }
-
-    /// 将 Value 转换为 i64
-    pub fn cast_to_i64(&self) -> Result<Value, EvalError> {
-        match self {
-            Value::I64(v) => Ok(Value::I64(*v)),
-            Value::I32(v) => Ok(Value::I64(*v as i64)),
-            Value::I8(v) => Ok(Value::I64(*v as i64)),
-            Value::Bool(v) => Ok(Value::I64(if *v { 1 } else { 0 })),
-            _ => Err(EvalError::TypeMismatch),
-        }
-    }
-
-    /// 将 Value 转换为 u64
-    pub fn cast_to_u64(&self) -> Result<Value, EvalError> {
-        match self {
-            Value::U64(v) => Ok(Value::U64(*v)),
-            Value::U32(v) => Ok(Value::U64(*v as u64)),
-            Value::U8(v) => Ok(Value::U64(*v as u64)),
-            Value::Bool(v) => Ok(Value::U64(if *v { 1 } else { 0 })),
             _ => Err(EvalError::TypeMismatch),
         }
     }
@@ -195,11 +146,7 @@ impl Value {
         // 根据目标类型进行转换
         match target_unwrapped {
             Ty::I32 => self.cast_to_i32(),
-            Ty::I8 => self.cast_to_i8(),
             Ty::U8 => self.cast_to_u8(),
-            Ty::U32 => self.cast_to_u32(),
-            Ty::I64 => self.cast_to_i64(),
-            Ty::U64 => self.cast_to_u64(),
             Ty::Bool => self.cast_to_bool(),
             // 对于其他类型（数组、结构体、指针），不进行转换
             _ => Ok(self.clone()),
@@ -209,11 +156,7 @@ impl Value {
     pub fn get_type(&self, module: &Module) -> Ty {
         match self {
             Value::I32(_) => Ty::I32,
-            Value::I8(_) => Ty::I8,
             Value::U8(_) => Ty::U8,
-            Value::U32(_) => Ty::U32,
-            Value::I64(_) => Ty::I64,
-            Value::U64(_) => Ty::U64,
             Value::Bool(_) => Ty::Bool,
             Value::String(_) => Ty::Pointer {
                 pointee: Box::new(Ty::U8),
@@ -319,11 +262,7 @@ impl Value {
         // 执行同类型运算
         match (lhs, rhs) {
             (Value::I32(l), Value::I32(r)) => impl_binary_ops!(l, r, op, I32, "i32"),
-            (Value::I8(l), Value::I8(r)) => impl_binary_ops!(l, r, op, I8, "i8"),
             (Value::U8(l), Value::U8(r)) => impl_binary_ops!(l, r, op, U8, "u8"),
-            (Value::U32(l), Value::U32(r)) => impl_binary_ops!(l, r, op, U32, "u32"),
-            (Value::I64(l), Value::I64(r)) => impl_binary_ops!(l, r, op, I64, "i64"),
-            (Value::U64(l), Value::U64(r)) => impl_binary_ops!(l, r, op, U64, "u64"),
             (Value::Bool(l), Value::Bool(r)) => match op {
                 EQEQ => Ok(Value::Bool(l == r)),
                 NEQ => Ok(Value::Bool(l != r)),
@@ -337,11 +276,7 @@ impl Value {
     fn cast_to_type(&self, target_ty: &Ty) -> Result<Value, EvalError> {
         match target_ty.unwrap_const() {
             Ty::I32 => self.cast_to_i32(),
-            Ty::I8 => self.cast_to_i8(),
             Ty::U8 => self.cast_to_u8(),
-            Ty::U32 => self.cast_to_u32(),
-            Ty::I64 => self.cast_to_i64(),
-            Ty::U64 => self.cast_to_u64(),
             Ty::Bool => self.cast_to_bool(),
             _ => Err(EvalError::TypeMismatch),
         }
@@ -363,11 +298,7 @@ impl Value {
             // 算术运算：bool 提升到 i32
             PLUS | MINUS => match val {
                 Value::I32(v) => impl_unary_ops!(v, op, I32),
-                Value::I8(v) => impl_unary_ops!(v, op, I8),
                 Value::U8(v) => impl_unary_ops!(v, op, U8),
-                Value::U32(v) => impl_unary_ops!(v, op, U32),
-                Value::I64(v) => impl_unary_ops!(v, op, I64),
-                Value::U64(v) => impl_unary_ops!(v, op, U64),
                 Value::Bool(_) => {
                     let i32_val = val.cast_to_i32()?;
                     Self::eval_unary(i32_val, op)
@@ -381,11 +312,7 @@ impl Value {
     pub fn get_array_size(&self) -> Option<i32> {
         match self {
             Value::I32(v) => Some(*v),
-            Value::U32(v) => Some(*v as i32),
-            Value::I8(v) => Some(*v as i32),
             Value::U8(v) => Some(*v as i32),
-            Value::U64(v) => Some(*v as i32),
-            Value::I64(v) => Some(*v as i32),
             _ => None,
         }
     }

@@ -27,16 +27,8 @@ pub enum Token {
     CONST_KW,
     #[token("i32")]
     INT_KW,
-    #[token("i8")]
-    I8_KW,
     #[token("u8")]
     U8_KW,
-    #[token("u32")]
-    U32_KW,
-    #[token("i64")]
-    I64_KW,
-    #[token("u64")]
-    U64_KW,
     #[token("bool")]
     BOOL_KW,
     #[token("void")]
@@ -145,10 +137,10 @@ pub enum Token {
     STRING_LITERAL,
     #[regex(r"'([^'\\]|\\.)'")]
     CHAR_LITERAL,
-    #[regex(r"0[xX][0-9a-fA-F]+(i8|i32|u8|u32|i64|u64)?", priority = 3)]
-    #[regex(r"0[oO][0-7]+(i8|i32|u8|u32|i64|u64)?", priority = 3)]
-    #[regex(r"0[bB][01]+(i8|i32|u8|u32|i64|u64)?", priority = 3)]
-    #[regex(r"[0-9]+(i8|i32|u8|u32|i64|u64)?", priority = 2)]
+    #[regex(r"0[xX][0-9a-fA-F]+(i32|u8)?", priority = 3)]
+    #[regex(r"0[oO][0-7]+(i32|u8)?", priority = 3)]
+    #[regex(r"0[bB][01]+(i32|u8)?", priority = 3)]
+    #[regex(r"[0-9]+(i32|u8)?", priority = 2)]
     INT_LITERAL,
 }
 
@@ -162,11 +154,7 @@ impl From<Token> for SyntaxKind {
             Token::IMPORT_KW => SyntaxKind::IMPORT_KW,
             Token::CONST_KW => SyntaxKind::CONST_KW,
             Token::INT_KW => SyntaxKind::I32_KW,
-            Token::I8_KW => SyntaxKind::I8_KW,
             Token::U8_KW => SyntaxKind::U8_KW,
-            Token::U32_KW => SyntaxKind::U32_KW,
-            Token::I64_KW => SyntaxKind::I64_KW,
-            Token::U64_KW => SyntaxKind::U64_KW,
             Token::BOOL_KW => SyntaxKind::BOOL_KW,
             Token::VOID_KW => SyntaxKind::VOID_KW,
             Token::IF_KW => SyntaxKind::IF_KW,
@@ -406,7 +394,7 @@ mod tests {
     }
 
     #[test]
-    fn test_new_integer_types() {
+    fn test_u8_type() {
         check(
             "let a: u8 = 255u8;",
             &[
@@ -428,14 +416,14 @@ mod tests {
     #[test]
     fn test_char_literal() {
         check(
-            "let c: i8 = 'A';",
+            "let c: u8 = 'A';",
             &[
                 (LET_KW, "let"),
                 (WHITESPACE, " "),
                 (IDENT, "c"),
                 (COLON, ":"),
                 (WHITESPACE, " "),
-                (I8_KW, "i8"),
+                (U8_KW, "u8"),
                 (WHITESPACE, " "),
                 (EQ, "="),
                 (WHITESPACE, " "),
@@ -448,14 +436,14 @@ mod tests {
     #[test]
     fn test_char_literal_escape() {
         check(
-            r"let c: i8 = '\n';",
+            r"let c: u8 = '\n';",
             &[
                 (LET_KW, "let"),
                 (WHITESPACE, " "),
                 (IDENT, "c"),
                 (COLON, ":"),
                 (WHITESPACE, " "),
-                (I8_KW, "i8"),
+                (U8_KW, "u8"),
                 (WHITESPACE, " "),
                 (EQ, "="),
                 (WHITESPACE, " "),

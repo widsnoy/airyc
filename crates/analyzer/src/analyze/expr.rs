@@ -208,7 +208,7 @@ impl ExprVisitor for Module {
                 }
                 Err(crate::value::EvalError::Overflow(msg)) => {
                     // 常量表达式溢出，报告错误
-                    // 但需要检查是否是 -128i8 这样的特例
+                    // 但需要检查是否是 i32 最小值这样的特例
                     let expr_range = expr.text_range();
                     if op_kind == SyntaxKind::MINUS
                         && self
@@ -235,24 +235,18 @@ impl ExprVisitor for Module {
             if op_kind == SyntaxKind::MINUS {
                 let expr_range = expr.text_range();
                 if let Some(literal_text) = self.analyzing.overflowing_literals.get(&expr_range) {
-                    // 检查是否是特例（如 -128i8）
+                    // 检查是否是 i32 最小值特例
                     // 特例：字面量截断后的值取负后等于自身（即最小负数）
                     let is_min_value = match val {
-                        Value::I8(v) => v == i8::MIN,
                         Value::I32(v) => v == i32::MIN,
-                        Value::I64(v) => v == i64::MIN,
                         _ => false,
                     };
 
                     if !is_min_value {
                         // 不是特例，报告溢出错误
                         let ty_str = match val {
-                            Value::I8(_) => "i8",
                             Value::U8(_) => "u8",
                             Value::I32(_) => "i32",
-                            Value::U32(_) => "u32",
-                            Value::I64(_) => "i64",
-                            Value::U64(_) => "u64",
                             _ => unreachable!(),
                         };
                         self.new_error(AnalyzeError::IntegerLiteralOverflow {
@@ -487,7 +481,7 @@ impl ExprVisitor for Module {
                         let idx_range = idx_expr.text_range();
                         let idx = match self.get_value_by_range(idx_range) {
                             Some(Value::I32(i)) => *i,
-                            Some(Value::I8(i)) => *i as i32,
+                            Some(Value::U8(i)) => *i as i32,
                             _ => return,
                         };
                         idx_values.push(idx);
@@ -605,16 +599,8 @@ impl ExprVisitor for Module {
             let s = n.text();
 
             // 分离后缀
-            let (num_part, suffix) = if let Some(ss) = s.strip_suffix("i64") {
-                (ss, Some("i64"))
-            } else if let Some(ss) = s.strip_suffix("u64") {
-                (ss, Some("u64"))
-            } else if let Some(ss) = s.strip_suffix("i32") {
+            let (num_part, suffix) = if let Some(ss) = s.strip_suffix("i32") {
                 (ss, Some("i32"))
-            } else if let Some(ss) = s.strip_suffix("u32") {
-                (ss, Some("u32"))
-            } else if let Some(ss) = s.strip_suffix("i8") {
-                (ss, Some("i8"))
             } else if let Some(ss) = s.strip_suffix("u8") {
                 (ss, Some("u8"))
             } else {
@@ -634,12 +620,8 @@ impl ExprVisitor for Module {
 
             // 根据后缀确定类型（默认 i32）
             let ty = match suffix {
-                Some("i8") => Ty::I8,
                 Some("u8") => Ty::U8,
                 Some("i32") | None => Ty::I32,
-                Some("u32") => Ty::U32,
-                Some("i64") => Ty::I64,
-                Some("u64") => Ty::U64,
                 _ => unreachable!(),
             };
 
@@ -652,12 +634,8 @@ impl ExprVisitor for Module {
                         .push(crate::error::AnalyzeError::IntegerLiteralOverflow {
                             literal: s.to_string(),
                             ty: match ty {
-                                Ty::I8 => "i8",
                                 Ty::U8 => "u8",
                                 Ty::I32 => "i32",
-                                Ty::U32 => "u32",
-                                Ty::I64 => "i64",
-                                Ty::U64 => "u64",
                                 _ => unreachable!(),
                             }
                             .to_string(),
@@ -669,29 +647,21 @@ impl ExprVisitor for Module {
 
             // 检查是否溢出
             let overflows = match ty {
-                Ty::I8 => value_u128 > i8::MAX as u128,
                 Ty::U8 => value_u128 > u8::MAX as u128,
                 Ty::I32 => value_u128 > i32::MAX as u128,
-                Ty::U32 => value_u128 > u32::MAX as u128,
-                Ty::I64 => value_u128 > i64::MAX as u128,
-                Ty::U64 => value_u128 > u64::MAX as u128,
                 _ => unreachable!(),
             };
 
             // 截断到目标类型
             let value = match ty {
-                Ty::I8 => Value::I8(value_u128 as i8),
                 Ty::U8 => Value::U8(value_u128 as u8),
                 Ty::I32 => Value::I32(value_u128 as i32),
-                Ty::U32 => Value::U32(value_u128 as u32),
-                Ty::I64 => Value::I64(value_u128 as i64),
-                Ty::U64 => Value::U64(value_u128 as u64),
                 _ => unreachable!(),
             };
 
             // 如果溢出，标记此字面量（后续在一元负号处理时检查）
             if overflows {
-                // 记录溢出的字面量，用于后续检测 -128i8 特例
+                // 记录溢出的字面量，用于后续检测 i32 最小值特例
                 self.analyzing
                     .overflowing_literals
                     .insert(range, s.to_string());

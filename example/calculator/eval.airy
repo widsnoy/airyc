@@ -31,7 +31,7 @@ fn has_eval_error() -> bool {
 }
 
 // 递归求值表达式
-fn eval(expr: *const struct Expr) -> i64 {
+fn eval(expr: *const struct Expr) -> i32 {
     if (expr == null) {
         g_eval_error = true;
         return 0i64;
@@ -46,8 +46,8 @@ fn eval(expr: *const struct Expr) -> i64 {
     // 二元运算
     if (expr->ty_id == EXPR_BINARY()) {
         let binary: *const struct BinaryExpr = cast_e2b(expr);
-        let left: i64 = eval(binary->lhs);
-        let right: i64 = eval(binary->rhs);
+        let left: i32 = eval(binary->lhs);
+        let right: i32 = eval(binary->rhs);
         
         if (g_eval_error) {
             return 0i64;
@@ -83,7 +83,7 @@ fn eval(expr: *const struct Expr) -> i64 {
     // 一元运算
     if (expr->ty_id == EXPR_UNARY()) {
         let unary: *const struct UnaryExpr = cast_e2u(expr);
-        let operand: i64 = eval(unary->expr);
+        let operand: i32 = eval(unary->expr);
         
         if (g_eval_error) {
             return 0i64;
@@ -106,7 +106,7 @@ fn eval(expr: *const struct Expr) -> i64 {
 }
 
 // 求值并返回结果（带错误检查）
-fn eval_expr(expr: *const struct Expr) -> i64 {
+fn eval_expr(expr: *const struct Expr) -> i32 {
     reset_eval_error();
     return eval(expr);
 }

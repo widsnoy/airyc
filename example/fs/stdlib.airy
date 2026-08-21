@@ -2,7 +2,7 @@ fn printf(format: *const u8, ...) -> i32;
 fn scanf(format: *const u8, ...) -> i32;
 fn putchar(c: i32) -> i32;
 fn puts(s: *const u8) -> i32;
-fn getchar() -> i8;
+fn getchar() -> u8;
 fn fopen(filename: *const u8, mode: *const u8) -> *mut void;
 fn fclose(stream: *mut void) -> i32;
 fn fread(ptr: *mut void, size: i32, count: i32, stream: *mut void) -> i32;

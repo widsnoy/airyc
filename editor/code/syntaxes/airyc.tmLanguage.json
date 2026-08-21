@@ -150,7 +150,7 @@
       "patterns": [
         {
           "name": "storage.type.primitive.airyc",
-          "match": "\\b(i32|i8|u8|u32|i64|u64|f32|bool|void)\\b"
+          "match": "\\b(i32|u8|bool|void)\\b"
         },
         {
           "match": "\\b(struct)\\s+([A-Za-z_][A-Za-z0-9_]*)",
@@ -172,15 +172,15 @@
       "patterns": [
         {
           "name": "constant.numeric.hex.airyc",
-          "match": "\\b0[xX][0-9a-fA-F]+(i8|u8|i32|u32|i64|u64)?\\b"
+          "match": "\\b0[xX][0-9a-fA-F]+(i32|u8)?\\b"
         },
         {
           "name": "constant.numeric.octal.airyc",
-          "match": "\\b0[oO][0-7]+(i8|u8|i32|u32|i64|u64)?\\b"
+          "match": "\\b0[oO][0-7]+(i32|u8)?\\b"
         },
         {
           "name": "constant.numeric.binary.airyc",
-          "match": "\\b0[bB][01]+(i8|u8|i32|u32|i64|u64)?\\b"
+          "match": "\\b0[bB][01]+(i32|u8)?\\b"
         },
         {
           "name": "constant.numeric.float.airyc",
@@ -188,7 +188,7 @@
         },
         {
           "name": "constant.numeric.decimal.airyc",
-          "match": "\\b[0-9]+(i8|u8|i32|u32|i64|u64)?\\b"
+          "match": "\\b[0-9]+(i32|u8)?\\b"
         }
       ]
     },

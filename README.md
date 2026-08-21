@@ -28,7 +28,8 @@ Path        := String ['::' Ident]
 GlobalDecl  := VarDef | FuncDef | StructDef | FuncAttach
 
 Type        := ['const'] PrimitType | Pointer Type | '[' Type ';' Expr ']'
-PrimitType  := 'void' | 'i64' | 'i32' | 'i8' | 'u64' | 'u32' | 'u8' | 'bool' | 'struct' Name
+PrimitType  := ScalarType | 'struct' Name
+ScalarType  := 'i32' | 'u8' | 'bool' | 'void'
 Pointer     := '*' ('mut' | 'const')
 
 VarDef      := 'let' Name ':' Type ['=' InitVal] ';'
@@ -128,7 +129,7 @@ attach foo {     // 实现（必须在同一文件）
 // 字符字面量：u8 类型
 let c: u8 = 'A';
 
-// 字符串字面量：*const u8 类型（注意不是 *const i8）
+// 字符串字面量：*const u8 类型
 fn printf(format: *const u8, ...);
 printf("Hello, World!\n");
 
@@ -160,20 +161,12 @@ let arr: [[i32; 3]; 2];
 #### 隐式转换（只允许无损扩展）
 
 ```rust
-// ✅ 有符号整数：bool → i8 → i32 → i64
-let a: i32 = 10i8;   // i8 → i32
-let b: i64 = 20i32;  // i32 → i64
-
-// ✅ 无符号整数：u8 → u32 → u64
-let c: u32 = 5u8;    // u8 → u32
-let d: u64 = 10u32;  // u32 → u64
-
-// ❌ 禁止：有符号和无符号不能混合
-let e: i32 = 10u32;  // 错误：TypeMismatch
-let f: u32 = 10i32;  // 错误：TypeMismatch
+// ✅ 整数无损提升：bool → u8 → i32
+let a: u8 = true;  // bool → u8
+let b: i32 = 20u8; // u8 → i32
 
 // ❌ 禁止：大类型到小类型
-let g: i8 = 100i32;  // 错误：TypeMismatch
+let c: u8 = 100i32; // 错误：TypeMismatch
 ```
 
 #### 指针转换
@@ -205,8 +198,8 @@ let p2: *const i32 = p + 2;  // 偏移 2 个 i32（8 字节）
 // 指针 - 整数：向前偏移
 let p3: *const i32 = p2 - 1;  // 回退 1 个 i32
 
-// 指针 - 指针：返回元素个数差（i64 类型）
-let diff: i64 = p2 - p;  // 结果是 2
+// 指针 - 指针：返回元素个数差（i32 类型）
+let diff: i32 = p2 - p;  // 结果是 2
 ```
 
 **提示**：`p[x]` 等价于 `*(p + x)`
@@ -352,10 +345,10 @@ semantic::recursive_type
 
 ### 类型不匹配
 
-有符号和无符号整数不能混合：
+整数不能隐式窄化：
 
 ```rust
-let a: i32 = 10u32;  // 错误
+let a: u8 = 10i32;  // 错误
 ```
 
 编译器输出：
@@ -363,12 +356,12 @@ let a: i32 = 10u32;  // 错误
 ```
 semantic::type_mismatch
 
-  × type mismatch: expected i32, found u32
+  × type mismatch: expected u8, found i32
    ╭─[demo.airy:2:18]
  1 │ fn main() -> i32 {
- 2 │     let a: i32 = 10u32;
-   ·                  ──┬──
-   ·                    ╰── here
+ 2 │     let a: u8 = 10i32;
+   ·                 ──┬──
+   ·                   ╰── here
  3 │     return 0;
    ╰────
 ```

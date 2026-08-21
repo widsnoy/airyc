@@ -163,3 +163,18 @@ fn test_array_initialize() {
     "#;
     insta::assert_snapshot!(try_it(code));
 }
+
+#[test]
+fn test_pointer_difference_is_i32() {
+    let code = r#"
+    fn main() -> i32 {
+        let values: [i32; 2] = {1, 2};
+        let first: *const i32 = &values[0];
+        let second: *const i32 = &values[1];
+        return second - first;
+    }
+    "#;
+    let ir = try_it(code);
+    assert!(ir.contains("ptr.diff.i32 = trunc i64"));
+    assert!(ir.contains("ret i32 %ptr.diff.i32"));
+}

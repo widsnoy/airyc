@@ -2,7 +2,7 @@ fn printf(t: *const u8, ...);
 fn puts(s: *const u8) -> i32;
 
 fn main() -> i32 {
-    // 字符串字面量的类型是 *const i8
+    // 字符串字面量的类型是 *const u8
     let msg: *const u8 = "Hello, airyc!";
     printf("String variable: %s\n", msg);
     

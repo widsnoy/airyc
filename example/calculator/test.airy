@@ -10,7 +10,7 @@ import "parser.airy" :: has_parse_error
 import "eval.airy" :: eval_expr
 import "eval.airy" :: has_eval_error
 
-fn test_expr(expr: *const u8, expected: i64) {
+fn test_expr(expr: *const u8, expected: i32) {
     printf("测试: %s\n", expr);
     
     let tokens: [struct Token; 128];
@@ -23,7 +23,7 @@ fn test_expr(expr: *const u8, expected: i64) {
         return;
     }
     
-    let result: i64 = eval_expr(ast);
+    let result: i32 = eval_expr(ast);
     
     if (has_eval_error()) {
         printf("  求值失败\n\n");

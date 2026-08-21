@@ -13,11 +13,7 @@ pub enum SyntaxKind {
     IMPORT_KW,   // "import"
     CONST_KW,    // "const"
     I32_KW,      // "i32"
-    I8_KW,       // "i8"
     U8_KW,       // "u8"
-    U32_KW,      // "u32"
-    I64_KW,      // "i64"
-    U64_KW,      // "u64"
     BOOL_KW,     // "bool"
     VOID_KW,     // "void"
     IF_KW,       // "if"
@@ -137,11 +133,7 @@ impl SyntaxKind {
             self,
             SyntaxKind::CONST_KW
                 | SyntaxKind::I32_KW
-                | SyntaxKind::I8_KW
                 | SyntaxKind::U8_KW
-                | SyntaxKind::U32_KW
-                | SyntaxKind::I64_KW
-                | SyntaxKind::U64_KW
                 | SyntaxKind::BOOL_KW
                 | SyntaxKind::VOID_KW
                 | SyntaxKind::IF_KW

@@ -134,7 +134,7 @@ fn format_variable_signature(
 ) -> String {
     let v = match value {
         Some(analyzer::value::Value::I32(x)) => x.to_string(),
-        Some(analyzer::value::Value::I8(x)) => x.to_string(),
+        Some(analyzer::value::Value::U8(x)) => x.to_string(),
         Some(analyzer::value::Value::Bool(x)) => x.to_string(),
         _ => variable.ty.to_string(),
     };

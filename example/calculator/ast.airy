@@ -8,13 +8,13 @@ fn OP_POS() -> u8 { return 5u8; }
 fn OP_NEG() -> u8 { return 6u8; }
 
 // 表达式类型常量函数
-fn EXPR_NUMBER() -> i8 { return 0i8; }
-fn EXPR_BINARY() -> i8 { return 1i8; }
-fn EXPR_UNARY() -> i8 { return 2i8; }
+fn EXPR_NUMBER() -> u8 { return 0u8; }
+fn EXPR_BINARY() -> u8 { return 1u8; }
+fn EXPR_UNARY() -> u8 { return 2u8; }
 
 // 数字字面量表达式
 struct NumberExpr {
-    value: i64,
+    value: i32,
 }
 
 // 二元运算表达式
@@ -33,7 +33,7 @@ struct UnaryExpr {
 // 通用表达式节点
 struct Expr {
     ptr: *mut void,
-    ty_id: i8,
+    ty_id: u8,
 }
 
 // 类型转换函数

@@ -608,7 +608,7 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
         r: inkwell::values::IntValue<'ctx>,
         ty: &Ty,
     ) -> Result<BasicValueEnum<'ctx>> {
-        let is_unsigned = matches!(ty, Ty::U8 | Ty::U32 | Ty::U64);
+        let is_unsigned = matches!(ty, Ty::U8);
 
         let res = match op {
             SyntaxKind::PLUS => self
@@ -660,7 +660,7 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
     ) -> Result<inkwell::values::IntValue<'ctx>> {
         use inkwell::IntPredicate;
 
-        let is_unsigned = matches!(ty, Ty::U8 | Ty::U32 | Ty::U64);
+        let is_unsigned = matches!(ty, Ty::U8);
 
         let predicate = match op {
             SyntaxKind::LT => {
@@ -760,6 +760,10 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
                     .builder
                     .build_int_signed_div(diff, size_val, "ptr.diff")
                     .map_err(|_| CodegenError::LlvmBuild("div"))?;
+                let result = self
+                    .builder
+                    .build_int_truncate(result, self.context.i32_type(), "ptr.diff.i32")
+                    .map_err(|_| CodegenError::LlvmBuild("pointer difference truncate"))?;
                 Ok(result.into())
             }
             // 指针比较运算

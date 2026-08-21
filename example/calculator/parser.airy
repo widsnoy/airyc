@@ -44,7 +44,7 @@ fn reset_pools() {
 }
 
 // 分配 NumberExpr
-fn alloc_number(value: i64) -> *mut struct NumberExpr {
+fn alloc_number(value: i32) -> *mut struct NumberExpr {
     if (g_pool_idx >= 128) {
         printf("Error: number pool exhausted\n");
         g_has_error = true;
@@ -86,7 +86,7 @@ fn alloc_unary(expr: *mut struct Expr, op: u8) -> *mut struct UnaryExpr {
 }
 
 // 分配 Expr
-fn alloc_expr(ptr: *mut void, ty_id: i8) -> *mut struct Expr {
+fn alloc_expr(ptr: *mut void, ty_id: u8) -> *mut struct Expr {
     if (g_pool_idx >= 256) {
         printf("Error: expr pool exhausted\n");
         g_has_error = true;
@@ -133,7 +133,7 @@ fn parse_factor() -> *mut struct Expr {
     
     // 数字
     if (tok->ty == TOK_NUMBER()) {
-        let value: i64 = tok->value;
+        let value: i32 = tok->value;
         advance();
         let num: *mut struct NumberExpr = alloc_number(value);
         let num_void: *mut void = num;

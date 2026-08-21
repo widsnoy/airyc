@@ -87,10 +87,10 @@ fn main() -> i32 {
         }
         
         // 求值
-        let result: i64 = eval_expr(expr);
+        let result: i32 = eval_expr(expr);
         
         if (!has_eval_error()) {
-            printf("%lld\n", result);
+            printf("%d\n", result);
         }
     }
     
