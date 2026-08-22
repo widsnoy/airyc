@@ -80,20 +80,12 @@ impl FuncVisitor for Module {
             return;
         };
 
-        let have_impl = node
-            .syntax()
-            .parent()
-            .and_then(FuncDef::cast)
-            .and_then(|x| x.block())
-            .is_some();
-
         if let Some(&func_id) = self.function_map.get(&name) {
             // 更新现有的 Function，填充参数
             if let Some(func_data) = self.get_function_mut_by_id(func_id) {
                 func_data.params = param_list;
                 func_data.meta_types = meta_type_list;
                 func_data.ret_type = ret_type.clone();
-                func_data.have_local_impl = have_impl;
                 func_data.is_variadic = is_variadic;
             }
         } else {
@@ -149,65 +141,5 @@ impl FuncVisitor for Module {
             param_type,
             range,
         );
-    }
-    fn enter_func_attach(&mut self, node: FuncAttach) {
-        // 新建作用域，导入函数签名的变量
-        self.analyzing.current_scope =
-            self.new_scope(Some(self.analyzing.current_scope), node.text_range());
-
-        let Some((func_name, func_var)) =
-            node.name().and_then(|n| utils::extract_name_and_range(&n))
-        else {
-            return;
-        };
-
-        let Some(func_id) = self.get_function_id_by_name(&func_name) else {
-            self.new_error(AnalyzeError::FunctionUndefined {
-                name: func_name,
-                range: func_var,
-            });
-            return;
-        };
-
-        // 不能实现外部函数
-        if func_id.module != self.file_id {
-            self.new_error(AnalyzeError::ImplementExternalFunction {
-                name: func_name,
-                range: func_var,
-            });
-            return;
-        }
-
-        let Some(func) = self.functions.get_mut(func_id.index) else {
-            return;
-        };
-
-        if func.have_local_impl {
-            self.new_error(AnalyzeError::FunctionImplemented {
-                name: func_name,
-                range: func_var,
-            });
-            return;
-        }
-
-        func.have_local_impl = true;
-
-        let scope = self.scopes.get_mut(*self.analyzing.current_scope).unwrap();
-        for (var_id, var_name) in func.params.iter().zip(func.meta_types.iter().map(|f| &f.0)) {
-            scope.variables.insert(var_name.clone(), *var_id);
-        }
-
-        self.analyzing.current_function_ret_type = Some(func.ret_type.clone());
-    }
-
-    fn leave_func_attach(&mut self, _node: FuncAttach) {
-        let Some(scope) = self.scopes.get(*self.analyzing.current_scope) else {
-            return;
-        };
-        let Some(parent_scope) = scope.parent else {
-            return;
-        };
-        self.analyzing.current_scope = parent_scope;
-        self.analyzing.current_function_ret_type = None;
     }
 }

@@ -23,6 +23,7 @@ fn try_it(code: &str) -> String {
     module.file_id = file_id;
 
     Project::allocate_module_symbols(&mut module);
+    Project::fill_definitions(&mut module);
 
     module.analyze();
 
@@ -177,4 +178,55 @@ fn test_pointer_difference_is_i32() {
     let ir = try_it(code);
     assert!(ir.contains("ptr.diff.i32 = trunc i64"));
     assert!(ir.contains("ret i32 %ptr.diff.i32"));
+}
+
+#[test]
+fn test_forward_function_call() {
+    let code = r#"
+    fn main() -> i32 {
+        return later(41);
+    }
+
+    fn later(value: i32) -> i32 {
+        return value + 1;
+    }
+    "#;
+    let ir = try_it(code);
+    assert!(ir.contains("call i32 @later(i32 41)"));
+}
+
+#[test]
+fn test_mutually_recursive_functions() {
+    let code = r#"
+    fn is_even(value: i32) -> i32 {
+        if (value == 0) {
+            return 1;
+        }
+        return is_odd(value - 1);
+    }
+
+    fn is_odd(value: i32) -> i32 {
+        if (value == 0) {
+            return 0;
+        }
+        return is_even(value - 1);
+    }
+    "#;
+    let ir = try_it(code);
+    assert!(ir.contains("call i32 @is_odd"));
+    assert!(ir.contains("call i32 @is_even"));
+}
+
+#[test]
+fn test_external_function_declaration() {
+    let code = r#"
+    fn putchar(value: i32) -> i32;
+
+    fn main() -> i32 {
+        return putchar(65);
+    }
+    "#;
+    let ir = try_it(code);
+    assert!(ir.contains("declare i32 @putchar(i32)"));
+    assert!(ir.contains("call i32 @putchar(i32 65)"));
 }

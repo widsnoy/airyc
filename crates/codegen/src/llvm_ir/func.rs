@@ -7,13 +7,6 @@ use crate::error::{CodegenError, Result};
 use crate::llvm_ir::Program;
 
 impl<'a, 'ctx> Program<'a, 'ctx> {
-    /// 编译函数定义
-    pub(super) fn compile_func_def(&mut self, func: FuncDef) -> Result<()> {
-        self.compile_func_signature(func.sign().unwrap())?;
-        self.compile_func_attach(func.sign().and_then(|n| n.name()), func.block())?;
-        Ok(())
-    }
-
     /// 编译函数签名（声明函数但不生成函数体）
     pub(super) fn compile_func_signature(&mut self, func: FuncSign) -> Result<()> {
         let name = func
@@ -58,8 +51,8 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
         Ok(())
     }
 
-    /// 编译函数体（为已声明的函数附加实现）
-    pub(super) fn compile_func_attach(
+    /// 编译已声明函数的函数体
+    pub(super) fn compile_func_body(
         &mut self,
         name: Option<Name>,
         block: Option<Block>,

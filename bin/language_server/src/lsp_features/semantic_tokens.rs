@@ -196,10 +196,7 @@ fn classify_identifier(
 
     // funcation
     if let Some(node) = token.parent().and_then(|n| n.parent())
-        && matches!(
-            node.kind(),
-            SyntaxKind::FUNC_SIGN | SyntaxKind::FUNC_ATTACH | SyntaxKind::CALL_EXPR
-        )
+        && matches!(node.kind(), SyntaxKind::FUNC_SIGN | SyntaxKind::CALL_EXPR)
     {
         return (Some(3), 0);
     }

@@ -75,7 +75,6 @@ macro_rules! dispatch_node {
             }
             SyntaxKind::FUNC_DEF => FuncDef::cast($node).map(|n| $self.enter_func_def(n)),
             SyntaxKind::FUNC_SIGN => FuncSign::cast($node).map(|n| $self.enter_func_sign(n)),
-            SyntaxKind::FUNC_ATTACH => FuncAttach::cast($node).map(|n| $self.enter_func_attach(n)),
             SyntaxKind::FUNC_F_PARAMS => {
                 FuncFParams::cast($node).map(|n| $self.enter_func_f_params(n))
             }
@@ -122,7 +121,6 @@ macro_rules! dispatch_node {
             }
             SyntaxKind::FUNC_DEF => FuncDef::cast($node).map(|n| $self.leave_func_def(n)),
             SyntaxKind::FUNC_SIGN => FuncSign::cast($node).map(|n| $self.leave_func_sign(n)),
-            SyntaxKind::FUNC_ATTACH => FuncAttach::cast($node).map(|n| $self.leave_func_attach(n)),
             SyntaxKind::FUNC_F_PARAMS => {
                 FuncFParams::cast($node).map(|n| $self.leave_func_f_params(n))
             }

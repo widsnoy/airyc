@@ -25,7 +25,7 @@ CompUnit    := {Header}{GlobalDecl}
 Header      := 'import' Path  
 Path        := String ['::' Ident]  
 
-GlobalDecl  := VarDef | FuncDef | StructDef | FuncAttach
+GlobalDecl  := VarDef | FuncDef | StructDef
 
 Type        := ['const'] PrimitType | Pointer Type | '[' Type ';' Expr ']'
 PrimitType  := ScalarType | 'struct' Name
@@ -40,8 +40,6 @@ FuncSign    := 'fn' Name '(' [FuncFParams] ')' ['->' Type]
 FuncFParams := FuncFParam {',' FuncFParam} ['...']
 FuncFParam  := Name: Type
 FuncRParams := Expr {',' Expr}
-FuncAttach  := 'attach' Name Block
-
 StructDef   := 'struct' Name '{' [StructField {',' StructField}] '}'
 StructField := Name: Type
 
@@ -96,7 +94,7 @@ Name        := Ident
 ## 语义说明
 
 
-### Import 和 Attach
+### Import
 
 #### Import（跨文件引用）
 
@@ -110,18 +108,14 @@ import "module.airy" :: Point     // 导入特定结构体
 - 不能引用：变量
 - 会检测循环依赖
 
-#### Attach（函数实现）
+#### 外部函数声明
 
 ```rust
-fn foo();        // 声明
-
-attach foo {     // 实现（必须在同一文件）
-    // ...
-}
+fn foo();
+fn printf(format: *const u8, ...) -> i32;
 ```
 
-- `attach` 只能给**本文件**的函数添加实现
-- 不能给外部（imported）函数添加实现
+当前 stage0 使用以分号结尾且没有函数体的 `fn ...;` 形式声明外部函数。
 
 ### 字符和字符串类型
 

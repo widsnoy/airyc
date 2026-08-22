@@ -5,7 +5,7 @@ use inkwell::values::{FunctionValue, GlobalValue, PointerValue};
 use inkwell::{builder::Builder, context::Context};
 use syntax::ast::*;
 
-use crate::error::Result;
+use crate::error::{CodegenError, Result};
 
 mod decl;
 mod expr;
@@ -61,12 +61,21 @@ impl<'a, 'ctx> Program<'a, 'ctx> {
             }
         }
 
+        // 先声明本模块的所有函数，保证函数定义顺序不影响调用。
+        for global in node.global_decls() {
+            if let GlobalDecl::FuncDef(func) = global {
+                let sign = func
+                    .sign()
+                    .ok_or(CodegenError::Missing("function signature"))?;
+                self.compile_func_signature(sign)?;
+            }
+        }
+
         for global in node.global_decls() {
             match global {
                 GlobalDecl::VarDef(decl) => self.compile_var_def(decl)?,
-                GlobalDecl::FuncDef(func) => self.compile_func_def(func)?,
-                GlobalDecl::FuncAttach(attach) => {
-                    self.compile_func_attach(attach.name(), attach.block())?
+                GlobalDecl::FuncDef(func) => {
+                    self.compile_func_body(func.sign().and_then(|n| n.name()), func.block())?
                 }
                 GlobalDecl::StructDef(_) => {}
             }

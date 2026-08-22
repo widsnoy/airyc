@@ -37,6 +37,8 @@ pub fn link_multiple_objects(
     for object_path in &object_paths {
         cmd.arg(object_path);
     }
+    #[cfg(windows)]
+    cmd.args(["-Xlinker", "-defaultlib:legacy_stdio_definitions"]);
     cmd.arg("-o").arg(&output_path);
 
     let output = cmd

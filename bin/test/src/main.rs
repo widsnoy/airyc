@@ -119,6 +119,8 @@ fn run_with_timeout(
         match child.try_wait() {
             Ok(Some(status)) => {
                 let return_code = status.code().unwrap_or(-1);
+                #[cfg(windows)]
+                let return_code = return_code & 0xff;
                 let mut std_out = child.stdout.take().unwrap();
                 let mut buf = vec![];
                 let _ = std::io::Read::read_to_end(&mut std_out, &mut buf);
@@ -151,7 +153,7 @@ fn run_test(case: &TestCase, args: &Args, tmp_dir: &Path) -> Result<TestResult> 
     let std_out = case.path.with_extension("out");
 
     let std_content = match fs::read_to_string(&std_out) {
-        Ok(content) => content,
+        Ok(content) => content.replace("\r\n", "\n"),
         Err(_) => {
             return Ok(TestResult {
                 case: case.clone(),
@@ -160,8 +162,6 @@ fn run_test(case: &TestCase, args: &Args, tmp_dir: &Path) -> Result<TestResult> 
             });
         }
     };
-
-    let my_out = tmp_dir.join("my_out.txt");
 
     let timeout = Duration::from_secs(args.timeout);
 
@@ -202,22 +202,13 @@ fn run_test(case: &TestCase, args: &Args, tmp_dir: &Path) -> Result<TestResult> 
         });
     }
 
-    let mut my_content = String::from_utf8_lossy(&my_output).to_string();
+    let mut my_content = String::from_utf8_lossy(&my_output).replace("\r\n", "\n");
     my_content.push_str(&format!("return: {}\n", my_return));
-
-    fs::write(&my_out, &my_content)?;
 
     let status = if std_content == my_content {
         TestStatus::Passed
     } else {
-        let diff_output = Command::new("diff")
-            .arg(&std_out)
-            .arg(&my_out)
-            .output()
-            .context("diff failed")?;
-
-        let diff = String::from_utf8_lossy(&diff_output.stdout).to_string();
-        TestStatus::Failed(diff)
+        TestStatus::Failed(format!("expected:\n{std_content}\nactual:\n{my_content}"))
     };
 
     Ok(TestResult {

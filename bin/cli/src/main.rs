@@ -4,6 +4,9 @@ mod compiling;
 mod error;
 mod linking;
 
+#[cfg(test)]
+mod test;
+
 use std::fs;
 
 use clap::Parser;

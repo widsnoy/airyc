@@ -66,7 +66,7 @@
         },
         {
           "name": "keyword.other.airyc",
-          "match": "\\b(fn|let|struct|import|attach)\\b"
+          "match": "\\b(fn|let|struct|import)\\b"
         },
         {
           "name": "storage.modifier.airyc",
@@ -101,13 +101,6 @@
       "patterns": [
         {
           "match": "\\b(fn)\\s+([a-z_][A-Za-z0-9_]*)\\s*(?=\\()",
-          "captures": {
-            "1": { "name": "keyword.other.airyc" },
-            "2": { "name": "entity.name.function.definition.airyc" }
-          }
-        },
-        {
-          "match": "\\b(attach)\\s+([a-z_][A-Za-z0-9_]*)\\s*(?=\\{)",
           "captures": {
             "1": { "name": "keyword.other.airyc" },
             "2": { "name": "entity.name.function.definition.airyc" }

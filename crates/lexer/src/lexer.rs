@@ -53,8 +53,6 @@ pub enum Token {
     FN_KW,
     #[token("mut")]
     MUT_KW,
-    #[token("attach")]
-    ATTACH_KW,
     #[token("null")]
     NULL_KW,
     #[token("true")]
@@ -164,7 +162,6 @@ impl From<Token> for SyntaxKind {
             Token::CONTINUE_KW => SyntaxKind::CONTINUE_KW,
             Token::RETURN_KW => SyntaxKind::RETURN_KW,
             Token::STRUCT_KW => SyntaxKind::STRUCT_KW,
-            Token::ATTACH_KW => SyntaxKind::ATTACH_KW,
             Token::NULL_KW => SyntaxKind::NULL_KW,
             Token::TRUE_KW => SyntaxKind::TRUE_KW,
             Token::FALSE_KW => SyntaxKind::FALSE_KW,

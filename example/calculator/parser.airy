@@ -123,10 +123,6 @@ fn match(ty: u8) -> bool {
     return false;
 }
 
-// 前向声明
-fn parse_expr() -> *mut struct Expr;
-fn parse_term() -> *mut struct Expr;
-
 // 解析 factor: number | '(' expr ')' | ('+' | '-') factor
 fn parse_factor() -> *mut struct Expr {
     let tok: *const struct Token = current_token();
@@ -174,7 +170,7 @@ fn parse_factor() -> *mut struct Expr {
 }
 
 // 解析 term: factor (('*' | '/' | '%') factor)*
-attach parse_term {
+fn parse_term() -> *mut struct Expr {
     let left: *mut struct Expr = parse_factor();
     
     while (true) {
@@ -202,7 +198,7 @@ attach parse_term {
 }
 
 // 解析 expr: term (('+' | '-') term)*
-attach parse_expr {
+fn parse_expr() -> *mut struct Expr {
     let left: *mut struct Expr = parse_term();
     
     while (true) {

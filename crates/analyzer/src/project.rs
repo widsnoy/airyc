@@ -220,15 +220,8 @@ impl Project {
                         continue;
                     }
 
-                    let func_id = module.new_function(
-                        name.clone(),
-                        vec![],
-                        vec![],
-                        Ty::Void,
-                        false,
-                        false,
-                        range,
-                    );
+                    let func_id =
+                        module.new_function(name.clone(), vec![], vec![], Ty::Void, false, range);
                     module.function_map.insert(name, func_id);
                 }
             } else if let Some(struct_def) = StructDef::cast(ele)

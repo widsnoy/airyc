@@ -125,8 +125,7 @@ ast_node!(
 ast_enum!(GlobalDecl {
     VarDef,
     FuncDef,
-    StructDef,
-    FuncAttach
+    StructDef
 });
 
 // 声明
@@ -202,13 +201,6 @@ impl FuncFParam {
         self.variadic_token().is_some()
     }
 }
-
-ast_node!(
-    FuncAttach ~ FUNC_ATTACH {
-        name: node(Name),
-        block: node(Block),
-    }
-);
 
 // 块和语句
 ast_node!(

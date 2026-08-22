@@ -34,7 +34,7 @@ fn has_eval_error() -> bool {
 fn eval(expr: *const struct Expr) -> i32 {
     if (expr == null) {
         g_eval_error = true;
-        return 0i64;
+        return 0;
     }
     
     // 数字字面量
@@ -50,7 +50,7 @@ fn eval(expr: *const struct Expr) -> i32 {
         let right: i32 = eval(binary->rhs);
         
         if (g_eval_error) {
-            return 0i64;
+            return 0;
         }
         
         if (binary->op == OP_ADD()) {
@@ -60,24 +60,24 @@ fn eval(expr: *const struct Expr) -> i32 {
         } else if (binary->op == OP_MUL()) {
             return left * right;
         } else if (binary->op == OP_DIV()) {
-            if (right == 0i64) {
+            if (right == 0) {
                 printf("Error: division by zero\n");
                 g_eval_error = true;
-                return 0i64;
+                return 0;
             }
             return left / right;
         } else if (binary->op == OP_MOD()) {
-            if (right == 0i64) {
+            if (right == 0) {
                 printf("Error: modulo by zero\n");
                 g_eval_error = true;
-                return 0i64;
+                return 0;
             }
             return left % right;
         }
         
         printf("Error: unknown binary operator\n");
         g_eval_error = true;
-        return 0i64;
+        return 0;
     }
     
     // 一元运算
@@ -86,7 +86,7 @@ fn eval(expr: *const struct Expr) -> i32 {
         let operand: i32 = eval(unary->expr);
         
         if (g_eval_error) {
-            return 0i64;
+            return 0;
         }
         
         if (unary->op == OP_POS()) {
@@ -97,12 +97,12 @@ fn eval(expr: *const struct Expr) -> i32 {
         
         printf("Error: unknown unary operator\n");
         g_eval_error = true;
-        return 0i64;
+        return 0;
     }
     
     printf("Error: unknown expression type\n");
     g_eval_error = true;
-    return 0i64;
+    return 0;
 }
 
 // 求值并返回结果（带错误检查）

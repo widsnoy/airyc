@@ -8,9 +8,6 @@ pub trait FuncVisitor {
     fn enter_func_sign(&mut self, _node: FuncSign) {}
     fn leave_func_sign(&mut self, _node: FuncSign) {}
 
-    fn enter_func_attach(&mut self, _node: FuncAttach) {}
-    fn leave_func_attach(&mut self, _node: FuncAttach) {}
-
     fn enter_func_f_params(&mut self, _node: FuncFParams) {}
     fn leave_func_f_params(&mut self, _node: FuncFParams) {}
 

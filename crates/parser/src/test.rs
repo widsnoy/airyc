@@ -311,3 +311,10 @@ import "../utils"::add
         panic!("Failed to parse CompUnit");
     }
 }
+
+#[test]
+fn test_attach_is_rejected() {
+    let parser = Parser::new("attach foo {}");
+    let (_, errors) = parser.parse();
+    assert!(!errors.is_empty());
+}
